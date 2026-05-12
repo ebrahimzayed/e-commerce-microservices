@@ -40,7 +40,7 @@ const Deals = () => {
             <Grid container spacing={2} >
                 <>
                     {
-                        deals.slice(0, 5).map((deal: any) => (
+                        deals.slice(0, 70).map((deal: any) => (
                             <Grid item key={deal.dealId}>
                                 <Link component="button"
                                     onClick={() => {

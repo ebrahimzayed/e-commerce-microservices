@@ -1,44 +1,74 @@
 const express = require('express');
-
-// recordRoutes is an instance of the express router.
-// We use it to define our routes.
-// The router will be added as a middleware and will take control of requests starting with path /listings.
 const recordRoutes = express.Router();
+const https = require('https');
 
-// This will help us connect to the database
-const dbo = require('../db/conn');
-
-// This section will help you get a list of all the records.
-recordRoutes.route('/deals').get(async function (_req, res) {
-  const dbConnect = dbo.getDb();
-
-  dbConnect
-    .collection('deals')
-    .find({})
-    .limit(50)
-    .toArray(function (err, result) {
-      if (err) {
-        res.status(400).send('Error fetching deals!');
-      } else {
-        res.json(result);
-      }
+const fetchFromDummy = (url) => {
+    return new Promise((resolve, reject) => {
+        https.get(url, (res) => {
+            let data = '';
+            res.on('data', (chunk) => data += chunk);
+            res.on('end', () => resolve(JSON.parse(data)));
+        }).on('error', reject);
     });
+};
+
+recordRoutes.route('/deals').get(async function (_req, res) {
+    try {
+        const data = await fetchFromDummy('https://dummyjson.com/products?limit=70');
+        const deals = data.products.map((p) => ({
+            dealId: 'd-' + p.id,
+            productId: String(p.id),
+            variantSku: p.sku,
+            department: p.category,
+            thumbnail: p.thumbnail,
+            image: p.images[0] || p.thumbnail,
+            title: p.title,
+            description: p.description,
+            shortDescription: p.title,
+            price: String(p.price),
+            currency: 'USD',
+            rating: String(p.rating)
+        }));
+        res.json(deals);
+    } catch (err) {
+        res.status(500).send('Error: ' + err.message);
+    }
 });
 
-// This section will help you get a list of all the records.
-recordRoutes.route('/products/sku/:id').get(async function (_req, res) {
-  const skuID = _req.params.id
-  const dbConnect = dbo.getDb();
+recordRoutes.route('/products').get(async function (_req, res) {
+    try {
+        const data = await fetchFromDummy('https://dummyjson.com/products?limit=70');
+        res.json(data.products);
+    } catch (err) {
+        res.status(500).send('Error: ' + err.message);
+    }
+});
 
-  dbConnect
-    .collection('products')
-    .findOne({'variants.sku': skuID}, (function (err, result) {
-      if (err) {
-        res.status(400).send('Error fetching deals!');
-      } else {
-        res.json(result);
-      }
-    }))
+recordRoutes.route('/products/sku/:id').get(async function (_req, res) {
+    try {
+        const sku = _req.params.id;
+        const data = await fetchFromDummy('https://dummyjson.com/products?limit=70');
+        const product = data.products.find(p => p.sku === sku);
+        if (!product) { res.json(null); return; }
+        res.json({
+            _id: String(product.id),
+            department: product.category,
+            category: product.category,
+            thumbnail: product.thumbnail,
+            image: product.images[0] || product.thumbnail,
+            title: product.title,
+            description: product.description,
+            shortDescription: product.title,
+            price: String(product.price),
+            currency: 'USD',
+            rating: String(product.rating),
+            attributes: { brand: product.brand || 'Generic' },
+            secondaryAttributes: {},
+            variants: [{ sku: product.sku, thumbnail: product.thumbnail, image: product.images[0] || product.thumbnail }]
+        });
+    } catch (err) {
+        res.status(500).send('Error: ' + err.message);
+    }
 });
 
 module.exports = recordRoutes;

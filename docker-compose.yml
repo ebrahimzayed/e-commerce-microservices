@@ -1,0 +1,107 @@
+services:
+
+  # =========================
+  # 1. Product Service
+  # =========================
+  db-products:
+    image: mongo:latest
+    container_name: products-db
+    restart: always
+
+  products-service:
+    build: ./products-cna-microservice
+    container_name: products-api
+    ports:
+      - "3001:5000"
+    environment:
+      MONGO_URI: "mongodb://db-products:27017/e-commerce"
+      DATABASE: "e-commerce"
+    depends_on:
+      - db-products
+
+
+  # =========================
+  # 2. Users Service
+  # =========================
+  db-users:
+    image: postgres:15-alpine
+    container_name: users-db
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: userdb
+
+  users-service:
+    build: ./users-cna-microservice
+    container_name: users-api
+    ports:
+      - "8000:9090"
+    environment:
+      DATABASE_URL: "postgresql://user:password@db-users:5432/userdb"
+    depends_on:
+      - db-users
+
+
+  # =========================
+  # 3. Cart Service
+  # =========================
+  db-cart:
+    image: redis:alpine
+    container_name: cart-cache
+
+  cart-service:
+    build: ./cart-cna-microservice
+    container_name: cart-api
+    ports:
+      - "8050:8080"
+    environment:
+      SPRING_REDIS_HOST: db-cart
+      SPRING_REDIS_PORT: "6379"
+      SPRING_REDIS_PASSWORD: ""
+    depends_on:
+      - db-cart
+
+
+  # =========================
+  # 4. Search Service (FIXED)
+  # =========================
+  search-engine:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.0
+    container_name: search-engine
+    ports:
+      - "9200:9200"
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+
+  search-service:
+    build: ./search-cna-microservice
+    container_name: search-api
+    ports:
+      - "3002:4000"
+    environment:
+      ELASTIC_URL: "http://search-engine:9200"
+    depends_on:
+      - search-engine
+
+
+  # =========================
+  # 5. Frontend
+  # =========================
+  store-ui:
+    build: ./store-ui
+    container_name: store-frontend
+    ports:
+      - "9000:80"
+    environment:
+      REACT_APP_PRODUCTS_URL: "http://products-service:5000"
+      REACT_APP_USERS_URL: "http://users-service:9090"
+      REACT_APP_CART_URL: "http://cart-service:8080"
+      REACT_APP_SEARCH_URL: "http://search-service:4000"
+    depends_on:
+      - products-service
+      - users-service
+      - cart-service
+      - search-service

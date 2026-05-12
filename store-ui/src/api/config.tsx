@@ -1,16 +1,15 @@
-import axios from "axios"
+import axios from "axios";
 
-const axiosClient = axios.create();
+export const productsUrl = "/api/products/";
+export const cartUrl = "/api/cart/";
+export const searchUrl = "/api/search";
+export const usersUrl = "/api/users/";
 
-axiosClient.defaults.headers.common = {
-  'Content-Type': 'application/json',
-  'Accept': 'application/json'
-}
+const axiosClient = axios.create({
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
+});
 
-//All request will wait 2 seconds before timeout
-axiosClient.defaults.timeout = 2000;
-
-export const productsUrl = process.env.REACT_APP_PRODCUTS_URL_BASE
-export const cartUrl = process.env.REACT_APP_CART_URL_BASE
-
-export default axiosClient
+export default axiosClient;

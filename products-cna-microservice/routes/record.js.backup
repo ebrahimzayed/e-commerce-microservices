@@ -1,0 +1,42 @@
+const express = require('express');
+const recordRoutes = express.Router();
+const dbo = require('../db/conn');
+
+// Get all deals
+recordRoutes.route('/deals').get(async function (_req, res) {
+  const dbConnect = dbo.getDb();
+  dbConnect.collection('deals').find({}).limit(50).toArray(function (err, result) {
+    if (err) {
+      res.status(400).send('Error fetching deals!');
+    } else {
+      res.json(result);
+    }
+  });
+});
+
+// Get all products
+recordRoutes.route('/products').get(async function (_req, res) {
+  const dbConnect = dbo.getDb();
+  dbConnect.collection('products').find({}).limit(50).toArray(function (err, result) {
+    if (err) {
+      res.status(400).send('Error fetching products!');
+    } else {
+      res.json(result);
+    }
+  });
+});
+
+// Get product by SKU
+recordRoutes.route('/products/sku/:id').get(async function (_req, res) {
+  const skuID = _req.params.id;
+  const dbConnect = dbo.getDb();
+  dbConnect.collection('products').findOne({'variants.sku': skuID}, function (err, result) {
+    if (err) {
+      res.status(400).send('Error fetching product!');
+    } else {
+      res.json(result);
+    }
+  });
+});
+
+module.exports = recordRoutes;

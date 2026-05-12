@@ -74,6 +74,7 @@ const Cart = () => {
                 ))}
                 <Grid container>
                     <Grid item xs={12} sx={{  display: 'flex', justifyContent: 'flex-end' }}>
+                        <Typography variant="h6">Total: ${cart?.total?.toFixed(2)}</Typography>
                         <Button variant="contained" startIcon={<PaidIcon />}>Checkout</Button>
                     </Grid>
                 </Grid>

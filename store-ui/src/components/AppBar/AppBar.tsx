@@ -63,6 +63,12 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
 export default function PrimarySearchAppBar() {
 
   const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const handleSearch = (e: any) => {
+    if (e.key === 'Enter' && searchQuery.trim()) {
+      navigate('/search?q=' + searchQuery);
+    }
+  };
 
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [mobileMoreAnchorEl, setMobileMoreAnchorEl] =
@@ -200,6 +206,9 @@ export default function PrimarySearchAppBar() {
               <StyledInputBase
                 placeholder="Search for products ..."
                 inputProps={{ 'aria-label': 'search' }}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={handleSearch}
               />
             </Search>
           </Box>

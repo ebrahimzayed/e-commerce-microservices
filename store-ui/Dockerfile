@@ -1,4 +1,4 @@
-FROM node:18-alpine3.16 AS build-step
+FROM node:18-alpine AS build-step
 
 # Update latest security patches
 RUN apk update && apk upgrade
@@ -26,8 +26,10 @@ COPY . .
 
 RUN npm run build
 
-FROM nginx:1.21.6-alpine
+
+FROM nginx:alpine
 COPY nginx.conf /etc/nginx/nginx.conf
+
 # SET default APP_BUILD_DIR path
 ARG APP_BUILD_DIR=/src/app
 # SET default APP_BUILD_DIR path

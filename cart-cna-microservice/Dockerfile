@@ -1,5 +1,5 @@
 
-FROM openjdk:17-alpine
+FROM eclipse-temurin:17-jdk-alpine
 RUN addgroup -S spring && adduser -S spring -G spring
 USER spring:spring
 ARG JAR_FILE=build/libs/cart-1.0.0.jar

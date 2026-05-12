@@ -1,12 +1,12 @@
-import axiosClient, {productsUrl} from "./config"
+import axios from "axios";
 
 const getProductByVariantSku = async (id: any) => {
     try {
-        const response = await axiosClient.get(productsUrl + 'products/sku/' + id)
-        return response.data
+        const response = await axios.get('/api/products/products/sku/' + id);
+        return response.data;
     } catch (err: any) {
-        
+        console.error("Error fetching product:", err);
     }
-}
+};
 
-export default getProductByVariantSku
+export default getProductByVariantSku;
