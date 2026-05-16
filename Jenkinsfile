@@ -4,6 +4,7 @@ pipeline {
     environment {
         DOCKER_REGISTRY = 'docker.io'
         IMAGE_TAG = "${BUILD_NUMBER}"
+        SONAR_URL = "http://192.168.148.130:9001"
     }
     
     stages {
@@ -13,6 +14,22 @@ pipeline {
                     branches: [[name: '*/main']],
                     userRemoteConfigs: [[url: 'https://github.com/ebrahimzayed/e-commerce-microservices.git']]
                 )
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonarqube') {
+                    sh '''
+                        docker run --rm \
+                          -e SONAR_HOST_URL=${SONAR_URL} \
+                          -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
+                          -v $(pwd):/usr/src \
+                          sonarsource/sonar-scanner-cli \
+                          -Dsonar.projectKey=e-commerce \
+                          -Dsonar.sources=.
+                    '''
+                }
             }
         }
         
