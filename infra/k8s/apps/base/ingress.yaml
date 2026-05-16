@@ -1,0 +1,38 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ecommerce-ingress
+  namespace: e-commerce
+  annotations:
+    # السطر ده هو "السر" اللي بيخلي الـ URL يتحول للسيرفس الصح
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: ecommerce.local
+    http:
+      paths:
+      # 1. مسار الموقع (UI)
+      - path: /(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: store-ui-service
+            port:
+              number: 80
+      # 2. مسار البحث
+      - path: /api/search/?(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: search-service
+            port:
+              number: 4000
+      # 3. مسار السلة
+      - path: /api/cart/?(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: cart-service
+            port:
+              number: 8080
