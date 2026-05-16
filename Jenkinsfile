@@ -62,6 +62,20 @@ pipeline {
                 }
             }
         }
+
+        stage('Trivy Scan') {
+            steps {
+                sh '''
+                    docker run --rm \
+                      -v /var/run/docker.sock:/var/run/docker.sock \
+                      aquasec/trivy:latest image \
+                      --exit-code 0 \
+                      --severity HIGH,CRITICAL \
+                      --format table \
+                      cart:${IMAGE_TAG}
+                '''
+            }
+        }
         
         stage('Deploy to K8s') {
             steps {
