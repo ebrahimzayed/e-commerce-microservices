@@ -66,14 +66,11 @@ pipeline {
         stage('Trivy Scan') {
             steps {
                 sh '''
-                    docker run --rm \
-                      -v /var/run/docker.sock:/var/run/docker.sock \
-                      -v /tmp/trivy-cache:/root/.cache/trivy \
-                      aquasec/trivy:latest image \
+                    trivy image \
                       --exit-code 0 \
                       --severity HIGH,CRITICAL \
                       --format table \
-                      --timeout 30m \
+                      --cache-dir /tmp/trivy-cache \
                       --scanners vuln \
                       cart:${IMAGE_TAG}
                 '''
