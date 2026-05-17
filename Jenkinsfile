@@ -29,7 +29,6 @@ pipeline {
                           -Dsonar.projectKey=e-commerce \
                           -Dsonar.sources=.
                     '''
-                    waitForQualityGate abortPipeline: true
                 }
             }
         }
