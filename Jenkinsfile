@@ -2,7 +2,7 @@ pipeline {
     agent any
     
     environment {
-        DOCKER_REGISTRY = 'docker.io'
+        DOCKER_REGISTRY = '192.168.148.130:8084'
         IMAGE_TAG = "${BUILD_NUMBER}"
         SONAR_URL = "http://192.168.148.130:9001"
     }
@@ -37,27 +37,27 @@ pipeline {
             parallel {
                 stage('Build Cart') {
                     steps {
-                        sh 'docker build -t cart:${IMAGE_TAG} ./cart-cna-microservice'
+                        sh 'docker build -t ${DOCKER_REGISTRY}/cart:${IMAGE_TAG} ./cart-cna-microservice'
                     }
                 }
                 stage('Build Products') {
                     steps {
-                        sh 'docker build -t products:${IMAGE_TAG} ./products-cna-microservice'
+                        sh 'docker build -t ${DOCKER_REGISTRY}/products:${IMAGE_TAG} ./products-cna-microservice'
                     }
                 }
                 stage('Build Search') {
                     steps {
-                        sh 'docker build -t search:${IMAGE_TAG} ./search-cna-microservice'
+                        sh 'docker build -t ${DOCKER_REGISTRY}/search:${IMAGE_TAG} ./search-cna-microservice'
                     }
                 }
                 stage('Build Users') {
                     steps {
-                        sh 'docker build -t users:${IMAGE_TAG} ./users-cna-microservice'
+                        sh 'docker build -t ${DOCKER_REGISTRY}/users:${IMAGE_TAG} ./users-cna-microservice'
                     }
                 }
                 stage('Build Store UI') {
                     steps {
-                        sh 'docker build -t store-ui:${IMAGE_TAG} ./store-ui'
+                        sh 'docker build -t ${DOCKER_REGISTRY}/store-ui:${IMAGE_TAG} ./store-ui'
                     }
                 }
             }
@@ -72,7 +72,19 @@ pipeline {
                       --format table \
                       --cache-dir /tmp/trivy-cache \
                       --scanners vuln \
-                      cart:${IMAGE_TAG}
+                      ${DOCKER_REGISTRY}/cart:${IMAGE_TAG}
+                '''
+            }
+        }
+
+        stage('Push to Nexus') {
+            steps {
+                sh '''
+                    docker push ${DOCKER_REGISTRY}/cart:${IMAGE_TAG}
+                    docker push ${DOCKER_REGISTRY}/products:${IMAGE_TAG}
+                    docker push ${DOCKER_REGISTRY}/search:${IMAGE_TAG}
+                    docker push ${DOCKER_REGISTRY}/users:${IMAGE_TAG}
+                    docker push ${DOCKER_REGISTRY}/store-ui:${IMAGE_TAG}
                 '''
             }
         }
@@ -80,11 +92,11 @@ pipeline {
         stage('Deploy to K8s') {
             steps {
                 sh '''
-                    minikube image load cart:${IMAGE_TAG}
-                    minikube image load products:${IMAGE_TAG}
-                    minikube image load search:${IMAGE_TAG}
-                    minikube image load users:${IMAGE_TAG}
-                    minikube image load store-ui:${IMAGE_TAG}
+                    minikube image load ${DOCKER_REGISTRY}/cart:${IMAGE_TAG}
+                    minikube image load ${DOCKER_REGISTRY}/products:${IMAGE_TAG}
+                    minikube image load ${DOCKER_REGISTRY}/search:${IMAGE_TAG}
+                    minikube image load ${DOCKER_REGISTRY}/users:${IMAGE_TAG}
+                    minikube image load ${DOCKER_REGISTRY}/store-ui:${IMAGE_TAG}
                     kubectl rollout restart deployment -n e-commerce
                 '''
             }
