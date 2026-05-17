@@ -32,6 +32,14 @@ pipeline {
                 }
             }
         }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 2, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
         
         stage('Build Images') {
             parallel {
@@ -109,9 +117,29 @@ pipeline {
     post {
         success {
             echo '✅ Pipeline succeeded!'
+            mail to: 'ebrahimzayed123456789@gmail.com',
+                 subject: "✅ Pipeline Succeeded - Build #${BUILD_NUMBER}",
+                 body: """
+                    Build #${BUILD_NUMBER} succeeded!
+                    
+                    Project: e-commerce-microservices
+                    Status: SUCCESS ✅
+                    
+                    Check details: ${BUILD_URL}
+                 """
         }
         failure {
             echo '❌ Pipeline failed!'
+            mail to: 'ebrahimzayed123456789@gmail.com',
+                 subject: "❌ Pipeline Failed - Build #${BUILD_NUMBER}",
+                 body: """
+                    Build #${BUILD_NUMBER} failed!
+                    
+                    Project: e-commerce-microservices
+                    Status: FAILURE ❌
+                    
+                    Check details: ${BUILD_URL}
+                 """
         }
     }
 }
