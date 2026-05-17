@@ -79,13 +79,16 @@ pipeline {
 
         stage('Push to Nexus') {
             steps {
-                sh '''
-                    docker push ${DOCKER_REGISTRY}/cart:${IMAGE_TAG}
-                    docker push ${DOCKER_REGISTRY}/products:${IMAGE_TAG}
-                    docker push ${DOCKER_REGISTRY}/search:${IMAGE_TAG}
-                    docker push ${DOCKER_REGISTRY}/users:${IMAGE_TAG}
-                    docker push ${DOCKER_REGISTRY}/store-ui:${IMAGE_TAG}
-                '''
+                withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                    sh '''
+                        echo $NEXUS_PASS | docker login ${DOCKER_REGISTRY} -u $NEXUS_USER --password-stdin
+                        docker push ${DOCKER_REGISTRY}/cart:${IMAGE_TAG}
+                        docker push ${DOCKER_REGISTRY}/products:${IMAGE_TAG}
+                        docker push ${DOCKER_REGISTRY}/search:${IMAGE_TAG}
+                        docker push ${DOCKER_REGISTRY}/users:${IMAGE_TAG}
+                        docker push ${DOCKER_REGISTRY}/store-ui:${IMAGE_TAG}
+                    '''
+                }
             }
         }
         
