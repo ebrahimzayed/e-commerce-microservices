@@ -29,13 +29,6 @@ pipeline {
                           -Dsonar.projectKey=e-commerce \
                           -Dsonar.sources=.
                     '''
-                }
-            }
-        }
-
-        stage('Quality Gate') {
-            steps {
-                timeout(time: 2, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -143,4 +136,3 @@ pipeline {
         }
     }
 }
-EOF
