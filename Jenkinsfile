@@ -104,6 +104,20 @@ pipeline {
                 '''
             }
         }
+
+        stage('KubeBench Scan') {
+            steps {
+                sh '''
+                    docker run --rm \
+                      --pid=host \
+                      -v /etc:/etc:ro \
+                      -v /var:/var:ro \
+                      -v ~/.kube:/root/.kube:ro \
+                      aquasec/kube-bench:latest run \
+                      --exit-code 0
+                '''
+            }
+        }
     }
     
     post {
