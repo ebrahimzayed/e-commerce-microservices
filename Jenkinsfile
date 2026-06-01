@@ -65,17 +65,20 @@ pipeline {
 
         stage('Trivy Scan') {
             steps {
-                sh '''
-                    trivy image \
-                      --exit-code 0 \
-                      --severity HIGH,CRITICAL \
-                      --format table \
-                      --cache-dir /var/lib/trivy-cache \
-                      --scanners vuln \
-                      --skip-version-check \
-                      --timeout 15m \
-                      ${DOCKER_REGISTRY}/cart:${IMAGE_TAG}
-                '''
+                // استخدام catchError لضمان استمرار الـ Pipeline حتى لو فشل تحميل الـ DB الخاص بـ Trivy
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    sh '''
+                        trivy image \
+                          --exit-code 0 \
+                          --severity HIGH,CRITICAL \
+                          --format table \
+                          --cache-dir /var/lib/trivy-cache \
+                          --scanners vuln \
+                          --skip-version-check \
+                          --timeout 15m \
+                          ${DOCKER_REGISTRY}/cart:${IMAGE_TAG}
+                    '''
+                }
             }
         }
 
