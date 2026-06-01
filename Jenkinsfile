@@ -73,6 +73,7 @@ pipeline {
                       --cache-dir /var/lib/trivy-cache \
                       --scanners vuln \
                       --skip-version-check \
+                      --skip-db-update \
                       --timeout 15m \
                       ${DOCKER_REGISTRY}/cart:${IMAGE_TAG}
                 '''
