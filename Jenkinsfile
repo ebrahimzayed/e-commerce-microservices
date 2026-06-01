@@ -25,7 +25,7 @@ pipeline {
                           -e SONAR_HOST_URL=${SONAR_URL} \
                           -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
                           -v $(pwd):/usr/src \
-                          sonarsource/sonar-scanner-cli \
+                          192.168.148.130:8084/sonar-scanner-cli:latest \
                           -Dsonar.projectKey=e-commerce \
                           -Dsonar.sources=.
                     '''
