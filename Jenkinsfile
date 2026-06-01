@@ -37,7 +37,14 @@ pipeline {
             parallel {
                 stage('Build Cart') {
                     steps {
-                        sh 'docker build -t ${DOCKER_REGISTRY}/cart:${IMAGE_TAG} ./cart-cna-microservice'
+                        // الانتقال لملف الميكروسيرفيس، بناء الـ JAR الجديد، ثم عمل الـ Docker build بدون كاش
+                        sh '''
+                            cd ./cart-cna-microservice
+                            chmod +x gradlew
+                            ./gradlew bootJar -x test
+                            cd ..
+                            docker build --no-cache -t ${DOCKER_REGISTRY}/cart:${IMAGE_TAG} ./cart-cna-microservice
+                        '''
                     }
                 }
                 stage('Build Products') {
