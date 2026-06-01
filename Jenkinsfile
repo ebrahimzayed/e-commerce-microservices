@@ -70,8 +70,10 @@ pipeline {
                       --exit-code 0 \
                       --severity HIGH,CRITICAL \
                       --format table \
-                      --cache-dir /tmp/trivy-cache \
+                      --cache-dir /var/lib/trivy-cache \
                       --scanners vuln \
+                      --skip-version-check \
+                      --timeout 15m \
                       ${DOCKER_REGISTRY}/cart:${IMAGE_TAG}
                 '''
             }
