@@ -1,13 +1,17 @@
 pipeline {
     agent any
-    
+
     environment {
-        DOCKER_REGISTRY = '192.168.148.130:8084'
-        IMAGE_TAG = "${BUILD_NUMBER}"
-        SONAR_URL = "http://192.168.148.130:9001"
+        AWS_REGION      = 'us-east-2'
+        AWS_ACCOUNT_ID  = '429104603739'
+        ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        IMAGE_TAG       = "${BUILD_NUMBER}"
+        EKS_CLUSTER     = 'ecommerce-eks'
+        SONAR_URL       = "http://192.168.148.130:9001"
     }
-    
+
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scmGit(
@@ -25,46 +29,45 @@ pipeline {
                           -e SONAR_HOST_URL=${SONAR_URL} \
                           -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
                           -v $(pwd):/usr/src \
-                          192.168.148.130:8084/sonar-scanner-cli:latest \
+                          sonarsource/sonar-scanner-cli:latest \
                           -Dsonar.projectKey=e-commerce \
                           -Dsonar.sources=.
                     '''
                 }
             }
         }
-        
+
         stage('Build Images') {
             parallel {
                 stage('Build Cart') {
                     steps {
-                        // الانتقال لملف الميكروسيرفيس، بناء الـ JAR الجديد، ثم عمل الـ Docker build بدون كاش
                         sh '''
                             cd ./cart-cna-microservice
                             chmod +x gradlew
                             ./gradlew bootJar -x test
                             cd ..
-                            docker build --no-cache -t ${DOCKER_REGISTRY}/cart:${IMAGE_TAG} ./cart-cna-microservice
+                            docker build --no-cache -t ${ECR_REGISTRY}/cart:${IMAGE_TAG} ./cart-cna-microservice
                         '''
                     }
                 }
                 stage('Build Products') {
                     steps {
-                        sh 'docker build -t ${DOCKER_REGISTRY}/products:${IMAGE_TAG} ./products-cna-microservice'
+                        sh 'docker build -t ${ECR_REGISTRY}/products:${IMAGE_TAG} ./products-cna-microservice'
                     }
                 }
                 stage('Build Search') {
                     steps {
-                        sh 'docker build -t ${DOCKER_REGISTRY}/search:${IMAGE_TAG} ./search-cna-microservice'
+                        sh 'docker build -t ${ECR_REGISTRY}/search:${IMAGE_TAG} ./search-cna-microservice'
                     }
                 }
                 stage('Build Users') {
                     steps {
-                        sh 'docker build -t ${DOCKER_REGISTRY}/users:${IMAGE_TAG} ./users-cna-microservice'
+                        sh 'docker build -t ${ECR_REGISTRY}/users:${IMAGE_TAG} ./users-cna-microservice'
                     }
                 }
                 stage('Build Store UI') {
                     steps {
-                        sh 'docker build -t ${DOCKER_REGISTRY}/store-ui:${IMAGE_TAG} ./store-ui'
+                        sh 'docker build -t ${ECR_REGISTRY}/store-ui:${IMAGE_TAG} ./store-ui'
                     }
                 }
             }
@@ -72,7 +75,6 @@ pipeline {
 
         stage('Trivy Scan') {
             steps {
-                // استخدام catchError لضمان استمرار الـ Pipeline حتى لو فشل تحميل الـ DB الخاص بـ Trivy
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     sh '''
                         trivy image \
@@ -83,37 +85,57 @@ pipeline {
                           --scanners vuln \
                           --skip-version-check \
                           --timeout 15m \
-                          ${DOCKER_REGISTRY}/cart:${IMAGE_TAG}
+                          ${ECR_REGISTRY}/cart:${IMAGE_TAG}
                     '''
                 }
             }
         }
 
-        stage('Push to Nexus') {
+        stage('Push to ECR') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
+                                  credentialsId: 'aws-credentials']]) {
                     sh '''
-                        echo $NEXUS_PASS | docker login ${DOCKER_REGISTRY} -u $NEXUS_USER --password-stdin
-                        docker push ${DOCKER_REGISTRY}/cart:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/products:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/search:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/users:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/store-ui:${IMAGE_TAG}
+                        aws ecr get-login-password --region ${AWS_REGION} | \
+                            docker login --username AWS --password-stdin ${ECR_REGISTRY}
+
+                        docker push ${ECR_REGISTRY}/cart:${IMAGE_TAG}
+                        docker push ${ECR_REGISTRY}/products:${IMAGE_TAG}
+                        docker push ${ECR_REGISTRY}/search:${IMAGE_TAG}
+                        docker push ${ECR_REGISTRY}/users:${IMAGE_TAG}
+                        docker push ${ECR_REGISTRY}/store-ui:${IMAGE_TAG}
                     '''
                 }
             }
         }
-        
-        stage('Deploy to K8s') {
+
+        stage('Update K8s Manifests') {
             steps {
-                sh '''
-                    minikube image load ${DOCKER_REGISTRY}/cart:${IMAGE_TAG}
-                    minikube image load ${DOCKER_REGISTRY}/products:${IMAGE_TAG}
-                    minikube image load ${DOCKER_REGISTRY}/search:${IMAGE_TAG}
-                    minikube image load ${DOCKER_REGISTRY}/users:${IMAGE_TAG}
-                    minikube image load ${DOCKER_REGISTRY}/store-ui:${IMAGE_TAG}
-                    kubectl rollout restart deployment -n e-commerce
-                '''
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
+                                  credentialsId: 'aws-credentials']]) {
+                    sh '''
+                        aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
+
+                        # Update image tags in deployments
+                        kubectl set image deployment/cart-deployment \
+                            cart=${ECR_REGISTRY}/cart:${IMAGE_TAG} -n e-commerce
+
+                        kubectl set image deployment/products-deployment \
+                            products=${ECR_REGISTRY}/products:${IMAGE_TAG} -n e-commerce
+
+                        kubectl set image deployment/search-deployment \
+                            search=${ECR_REGISTRY}/search:${IMAGE_TAG} -n e-commerce
+
+                        kubectl set image deployment/users-deployment \
+                            users=${ECR_REGISTRY}/users:${IMAGE_TAG} -n e-commerce
+
+                        kubectl set image deployment/store-ui-deployment \
+                            store-ui=${ECR_REGISTRY}/store-ui:${IMAGE_TAG} -n e-commerce
+
+                        # Wait for rollout
+                        kubectl rollout status deployment -n e-commerce --timeout=300s
+                    '''
+                }
             }
         }
 
@@ -131,7 +153,7 @@ pipeline {
             }
         }
     }
-    
+
     post {
         success {
             echo '✅ Pipeline succeeded!'
@@ -139,10 +161,10 @@ pipeline {
                  subject: "✅ Pipeline Succeeded - Build #${BUILD_NUMBER}",
                  body: """
                     Build #${BUILD_NUMBER} succeeded!
-                    
+
                     Project: e-commerce-microservices
                     Status: SUCCESS ✅
-                    
+
                     Check details: ${BUILD_URL}
                  """
         }
@@ -152,10 +174,10 @@ pipeline {
                  subject: "❌ Pipeline Failed - Build #${BUILD_NUMBER}",
                  body: """
                     Build #${BUILD_NUMBER} failed!
-                    
+
                     Project: e-commerce-microservices
                     Status: FAILURE ❌
-                    
+
                     Check details: ${BUILD_URL}
                  """
         }
