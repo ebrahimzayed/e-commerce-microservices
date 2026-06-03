@@ -116,7 +116,6 @@ pipeline {
                     sh '''
                         aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
 
-                        # Update image tags in deployments
                         kubectl set image deployment/cart-deployment \
                             cart=${ECR_REGISTRY}/cart:${IMAGE_TAG} -n e-commerce
 
@@ -132,7 +131,6 @@ pipeline {
                         kubectl set image deployment/store-ui-deployment \
                             store-ui=${ECR_REGISTRY}/store-ui:${IMAGE_TAG} -n e-commerce
 
-                        # Wait for rollout
                         kubectl rollout status deployment -n e-commerce --timeout=300s
                     '''
                 }
@@ -161,10 +159,8 @@ pipeline {
                  subject: "✅ Pipeline Succeeded - Build #${BUILD_NUMBER}",
                  body: """
                     Build #${BUILD_NUMBER} succeeded!
-
                     Project: e-commerce-microservices
                     Status: SUCCESS ✅
-
                     Check details: ${BUILD_URL}
                  """
         }
@@ -174,10 +170,8 @@ pipeline {
                  subject: "❌ Pipeline Failed - Build #${BUILD_NUMBER}",
                  body: """
                     Build #${BUILD_NUMBER} failed!
-
                     Project: e-commerce-microservices
                     Status: FAILURE ❌
-
                     Check details: ${BUILD_URL}
                  """
         }
