@@ -3,6 +3,9 @@ kind: Deployment
 metadata:
   name: store-ui-deployment
 spec:
+  replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: store-ui-deployment
@@ -13,8 +16,8 @@ spec:
     spec:
       containers:
       - name: store-ui
-        image: store-ui:latest
-        imagePullPolicy: IfNotPresent
+        image: 429104603739.dkr.ecr.us-east-2.amazonaws.com/store-ui:latest
+        imagePullPolicy: Always
         ports:
         - name: http
           containerPort: 80

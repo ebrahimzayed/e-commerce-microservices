@@ -3,6 +3,9 @@ kind: Deployment
 metadata:
   name: users-deployment
 spec:
+  replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: users-deployment
@@ -13,9 +16,9 @@ spec:
     spec:
       containers:
       - name: users
-        image: users:latest
-        imagePullPolicy: IfNotPresent
+        image: 429104603739.dkr.ecr.us-east-2.amazonaws.com/users:latest
+        imagePullPolicy: Always
         ports:
         - name: http
-          containerPort: 9090
+          containerPort: 3000
           protocol: TCP

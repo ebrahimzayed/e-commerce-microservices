@@ -3,6 +3,9 @@ kind: Deployment
 metadata:
   name: search-deployment
 spec:
+  replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: search-deployment
@@ -13,14 +16,14 @@ spec:
     spec:
       containers:
       - name: search
-        image: search:latest
-        imagePullPolicy: IfNotPresent
+        image: 429104603739.dkr.ecr.us-east-2.amazonaws.com/search:latest
+        imagePullPolicy: Always
         env:
-        - name: ELASTIC_URL  ## Define the name of the variable
+        - name: ELASTIC_URL
           valueFrom:
             configMapKeyRef:
-              name: search-configmap   ## This must match the name of the configmap
-              key: ELASTIC_URL  ## The key to fetch
+              name: search-configmap
+              key: ELASTIC_URL
         ports:
         - name: http
           containerPort: 4000
