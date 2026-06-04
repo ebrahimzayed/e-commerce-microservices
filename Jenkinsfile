@@ -25,6 +25,9 @@ pipeline {
             steps {
                 withSonarQubeEnv('sonarqube') {
                     sh '''
+                        # إعطاء صلاحيات قراءة كاملة للمجلد لضمان وصول الحاوية له
+                        chmod -R 755 .
+                        
                         docker run --rm \
                           -e SONAR_HOST_URL=${SONAR_URL} \
                           -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
@@ -33,7 +36,7 @@ pipeline {
                           sonarsource/sonar-scanner-cli:latest \
                           -Dsonar.projectKey=e-commerce \
                           -Dsonar.projectName=e-commerce \
-                          -Dsonar.sources=. \
+                          -Dsonar.sources=/usr/src \
                           -Dsonar.projectBaseDir=/usr/src \
                           -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
                     '''
