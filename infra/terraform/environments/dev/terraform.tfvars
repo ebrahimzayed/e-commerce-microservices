@@ -4,3 +4,6 @@ public_subnets  = "10.0.0.128/26"
 private_subnets = "10.0.0.192/26"
 ami_id = "ami-0490fddec0cbeb88b"
 key_name        = "k8s-key"
+desired_nodes = 2
+min_nodes     = 2
+max_nodes     = 3

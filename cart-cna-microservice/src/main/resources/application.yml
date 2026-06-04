@@ -3,5 +3,6 @@ spring:
     host: ${SPRING_REDIS_HOST}
     port: ${SPRING_REDIS_PORT}
     password: ${SPRING_REDIS_PASSWORD}
-    server:
-      port: 8090
+
+server:
+  port: 8080

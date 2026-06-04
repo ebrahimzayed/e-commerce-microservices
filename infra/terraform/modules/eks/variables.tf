@@ -11,8 +11,18 @@ variable "k8s_version" {
 }
 
 variable "subnet_ids" {
-  description = "List of subnet IDs for EKS"
+  description = "List of subnet IDs for EKS cluster"
   type        = list(string)
+}
+
+variable "public_subnet_id" {
+  description = "Public subnet ID for the EKS Node Group"
+  type        = string
+}
+
+variable "private_subnet_id" {
+  description = "Private subnet ID"
+  type        = string
 }
 
 variable "node_instance_type" {
@@ -28,7 +38,7 @@ variable "desired_nodes" {
 
 variable "min_nodes" {
   type    = number
-  default = 1
+  default = 2
 }
 
 variable "max_nodes" {

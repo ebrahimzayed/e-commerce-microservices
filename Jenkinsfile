@@ -21,6 +21,21 @@ pipeline {
             }
         }
 
+        stage('Trivy File System Scan') {
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    echo '🔍 Running Trivy File System Scan to discover vulnerabilities in source code...'
+                    sh '''
+                        trivy fs \
+                          --exit-code 0 \
+                          --severity HIGH,CRITICAL \
+                          --format table \
+                          .
+                    '''
+                }
+            }
+        }
+
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonarqube') {
@@ -92,19 +107,16 @@ EOF
             }
         }
 
-        stage('Trivy Scan') {
+        stage('Trivy Image Scan') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    echo '🛡️ Running Trivy Scan on all built Microservices Images...'
                     sh '''
-                        trivy image \
-                          --exit-code 0 \
-                          --severity HIGH,CRITICAL \
-                          --format table \
-                          --cache-dir /var/lib/trivy-cache \
-                          --scanners vuln \
-                          --skip-version-check \
-                          --timeout 15m \
-                          ${ECR_REGISTRY}/cart:${IMAGE_TAG}
+                        trivy image --exit-code 0 --severity HIGH,CRITICAL --format table --cache-dir /var/lib/trivy-cache --scanners vuln --skip-version-check --timeout 15m ${ECR_REGISTRY}/cart:${IMAGE_TAG}
+                        trivy image --exit-code 0 --severity HIGH,CRITICAL --format table --cache-dir /var/lib/trivy-cache --scanners vuln --skip-version-check --timeout 15m ${ECR_REGISTRY}/products:${IMAGE_TAG}
+                        trivy image --exit-code 0 --severity HIGH,CRITICAL --format table --cache-dir /var/lib/trivy-cache --scanners vuln --skip-version-check --timeout 15m ${ECR_REGISTRY}/search:${IMAGE_TAG}
+                        trivy image --exit-code 0 --severity HIGH,CRITICAL --format table --cache-dir /var/lib/trivy-cache --scanners vuln --skip-version-check --timeout 15m ${ECR_REGISTRY}/users:${IMAGE_TAG}
+                        trivy image --exit-code 0 --severity HIGH,CRITICAL --format table --cache-dir /var/lib/trivy-cache --scanners vuln --skip-version-check --timeout 15m ${ECR_REGISTRY}/store-ui:${IMAGE_TAG}
                     '''
                 }
             }

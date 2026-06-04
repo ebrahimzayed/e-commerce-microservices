@@ -17,13 +17,16 @@ module "ec2" {
   ami_id           = var.ami_id
   key_name         = var.key_name
 }
-
 module "eks" {
   source             = "../../modules/eks"
   cluster_name       = "ecommerce-eks"
   subnet_ids         = [module.vpc.public_subnet_id, module.vpc.private_subnet_id]
+  public_subnet_id   = module.vpc.public_subnet_id
+  private_subnet_id  = module.vpc.private_subnet_id
   node_instance_type = "t3.medium"
+  
+  # 🎯 الأرقام الجديدة متثبتة هنا عشان نجبر الـ Module تقراها
   desired_nodes      = 2
-  min_nodes          = 1
+  min_nodes          = 2
   max_nodes          = 3
 }

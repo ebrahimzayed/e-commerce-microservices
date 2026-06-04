@@ -68,11 +68,15 @@ resource "aws_iam_role_policy_attachment" "eks_ecr_policy" {
 # Node Group
 resource "aws_eks_node_group" "main" {
   cluster_name    = aws_eks_cluster.main.name
-  node_group_name = "${var.cluster_name}-node-group"
+  node_group_name = "${var.cluster_name}-node-group-v4"
   node_role_arn   = aws_iam_role.eks_node_role.arn
-  subnet_ids      = var.subnet_ids
+
+  # ✅ تعديل الـ Subnets عشان الكلاستر تتوزع صح وتقدر تقوم كذا سيرفر
+  subnet_ids      = var.subnet_ids 
+
   instance_types  = [var.node_instance_type]
 
+  # 🎯 البلوك السحري اللي كان ناقص ورجعناه مكانه بأرقام المتغيرات
   scaling_config {
     desired_size = var.desired_nodes
     min_size     = var.min_nodes

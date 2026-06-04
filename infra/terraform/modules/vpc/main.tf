@@ -8,12 +8,10 @@ resource "aws_internet_gateway" "IGW" {
 }
 
 resource "aws_subnet" "publicsubnets" {
-
-  vpc_id            = aws_vpc.Main.id
+  vpc_id                  = aws_vpc.Main.id
   map_public_ip_on_launch = true
-
-  cidr_block        = var.public_subnets
-  availability_zone = "${var.region}a"
+  cidr_block              = var.public_subnets
+  availability_zone       = "${var.region}a"
 }
 
 resource "aws_subnet" "privatesubnets" {
@@ -49,10 +47,11 @@ resource "aws_route_table_association" "PrivateRTassociation" {
 }
 
 resource "aws_eip" "nateIP" {
-  vpc = true
+  depends_on = [aws_internet_gateway.IGW]
 }
 
 resource "aws_nat_gateway" "NATgw" {
   allocation_id = aws_eip.nateIP.id
   subnet_id     = aws_subnet.publicsubnets.id
+  depends_on    = [aws_internet_gateway.IGW]
 }
