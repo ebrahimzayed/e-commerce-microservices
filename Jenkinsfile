@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -116,18 +117,62 @@ pipeline {
                     sh '''
                         aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
 
+                        # إنشاء الـ namespaces لو مش موجودين
+                        kubectl get namespace e-commerce || kubectl create namespace e-commerce
+                        kubectl get namespace shared-services || kubectl create namespace shared-services
+
+                        # deploy الـ shared services
+                        kubectl apply -f infra/k8s/shared-services/base/redis/ -n shared-services || true
+                        kubectl apply -f infra/k8s/shared-services/base/mongodb/ -n shared-services || true
+
+                        # إنشاء الـ configmaps لو مش موجودين
+                        kubectl get configmap cart-configmap -n e-commerce || \
+                        kubectl create configmap cart-configmap \
+                            --from-literal=SPRING_REDIS_HOST=redis-service.shared-services.svc.cluster.local \
+                            --from-literal=SPRING_REDIS_PORT=6379 \
+                            --from-literal=SPRING_REDIS_PASSWORD="" \
+                            --from-literal=SPRING_DATA_REDIS_HOST=redis-service.shared-services.svc.cluster.local \
+                            --from-literal=SPRING_DATA_REDIS_PORT=6379 \
+                            --from-literal=SPRING_DATA_REDIS_PASSWORD="" \
+                            -n e-commerce
+
+                        kubectl get configmap products-configmap -n e-commerce || \
+                        kubectl create configmap products-configmap \
+                            --from-literal=MONGO_URI=mongodb://mongo-service.shared-services.svc.cluster.local:27017 \
+                            --from-literal=DATABASE=products \
+                            -n e-commerce
+
+                        kubectl get configmap search-configmap -n e-commerce || \
+                        kubectl create configmap search-configmap \
+                            --from-literal=ELASTIC_URL=http://elasticsearch-service.shared-services.svc.cluster.local:9200 \
+                            -n e-commerce
+
+                        # deploy الـ apps
+                        kubectl apply -f infra/k8s/apps/base/cart/ -n e-commerce || true
+                        kubectl apply -f infra/k8s/apps/base/products/ -n e-commerce || true
+                        kubectl apply -f infra/k8s/apps/base/search/ -n e-commerce || true
+                        kubectl apply -f infra/k8s/apps/base/users/ -n e-commerce || true
+                        kubectl apply -f infra/k8s/apps/base/store-ui/ -n e-commerce || true
+
+                        # expose الـ services المطلوبة للـ store-ui
+                        kubectl get svc products-api -n e-commerce || \
+                            kubectl expose deployment products-deployment --name=products-api --port=5000 --target-port=5000 -n e-commerce
+                        kubectl get svc cart-api -n e-commerce || \
+                            kubectl expose deployment cart-deployment --name=cart-api --port=8080 --target-port=8080 -n e-commerce
+                        kubectl get svc search-api -n e-commerce || \
+                            kubectl expose deployment search-deployment --name=search-api --port=4000 --target-port=4000 -n e-commerce
+                        kubectl get svc users-api -n e-commerce || \
+                            kubectl expose deployment users-deployment --name=users-api --port=9090 --target-port=9090 -n e-commerce
+
+                        # update الـ images
                         kubectl set image deployment/cart-deployment \
                             cart=${ECR_REGISTRY}/cart:${IMAGE_TAG} -n e-commerce
-
                         kubectl set image deployment/products-deployment \
                             products=${ECR_REGISTRY}/products:${IMAGE_TAG} -n e-commerce
-
                         kubectl set image deployment/search-deployment \
                             search=${ECR_REGISTRY}/search:${IMAGE_TAG} -n e-commerce
-
                         kubectl set image deployment/users-deployment \
                             users=${ECR_REGISTRY}/users:${IMAGE_TAG} -n e-commerce
-
                         kubectl set image deployment/store-ui-deployment \
                             store-ui=${ECR_REGISTRY}/store-ui:${IMAGE_TAG} -n e-commerce
 
