@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -32,7 +31,9 @@ pipeline {
                           -v $(pwd):/usr/src \
                           sonarsource/sonar-scanner-cli:latest \
                           -Dsonar.projectKey=e-commerce \
-                          -Dsonar.sources=.
+                          -Dsonar.projectBaseDir=/usr/src \
+                          -Dsonar.sources=. \
+                          -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
                     '''
                 }
             }
