@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const Header = () => {
   const navigate = useNavigate();
@@ -7,11 +7,15 @@ const Header = () => {
   return (
     <header className="bg-blue-600 text-white shadow-md p-4 sticky top-0 z-50">
       <div className="container mx-auto flex justify-between items-center">
+        
         {/* العودة للرئيسية */}
-        <Link to="/" className="text-2xl font-bold flex items-center space-x-2">
+        <div 
+          onClick={() => window.location.href = '/'} 
+          className="text-2xl font-bold flex items-center space-x-2 cursor-pointer"
+        >
           <span>🛍️</span>
           <span>e-commerce store</span>
-        </Link>
+        </div>
 
         {/* خانة البحث */}
         <div className="flex-1 max-w-xl mx-8">
@@ -27,13 +31,17 @@ const Header = () => {
           />
         </div>
 
-        {/* زرار السلة السحري والمربوط بالمسار صح */}
+        {/* زرار السلة الإجباري والمباشر */}
         <div className="flex items-center space-x-6">
-          <Link to="/cart" className="relative p-2 hover:bg-blue-700 rounded-full transition flex items-center space-x-1">
+          <div 
+            onClick={() => window.location.href = '/cart'} 
+            className="relative p-2 hover:bg-blue-700 rounded-full transition flex items-center space-x-1 cursor-pointer"
+          >
             <span className="text-2xl">🛒</span>
             <span className="text-sm font-semibold hidden md:inline">My Cart</span>
-          </Link>
+          </div>
         </div>
+
       </div>
     </header>
   );
