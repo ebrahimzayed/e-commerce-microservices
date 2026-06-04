@@ -1,23 +1,19 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
 
 const Header = () => {
   const navigate = useNavigate();
-  
-  // قراءة السلة والثيم مباشرة بدون استخدام custom hooks
-  const cartItems = useSelector((state: any) => state.cart?.cartItems || []);
-
-  const totalQuantity = cartItems.reduce((acc: number, item: any) => acc + item.quantity, 0);
 
   return (
     <header className="bg-blue-600 text-white shadow-md p-4 sticky top-0 z-50">
       <div className="container mx-auto flex justify-between items-center">
+        {/* العودة للرئيسية */}
         <Link to="/" className="text-2xl font-bold flex items-center space-x-2">
           <span>🛍️</span>
           <span>e-commerce store</span>
         </Link>
 
+        {/* خانة البحث */}
         <div className="flex-1 max-w-xl mx-8">
           <input
             type="text"
@@ -31,14 +27,11 @@ const Header = () => {
           />
         </div>
 
+        {/* زرار السلة السحري والمربوط بالمسار صح */}
         <div className="flex items-center space-x-6">
-          <Link to="/cart" className="relative p-2 hover:bg-blue-700 rounded-full transition">
+          <Link to="/cart" className="relative p-2 hover:bg-blue-700 rounded-full transition flex items-center space-x-1">
             <span className="text-2xl">🛒</span>
-            {totalQuantity > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold animate-bounce">
-                {totalQuantity}
-              </span>
-            )}
+            <span className="text-sm font-semibold hidden md:inline">My Cart</span>
           </Link>
         </div>
       </div>
