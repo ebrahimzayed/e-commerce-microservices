@@ -25,18 +25,30 @@ pipeline {
             steps {
                 withSonarQubeEnv('sonarqube') {
                     sh '''
-                        # تشغيل السكنر كـ container وتمرير متغيرات السيرفر مباشرة مع فحص الـ Current Directory
+                        # 1. إنشاء Dockerfile مؤقت يقوم بنسخ الكود كاملاً لداخل الحاوية
+                        cat << 'EOF' > SonarDockerfile
+                        FROM sonarsource/sonar-scanner-cli:latest
+                        COPY . /usr/src
+                        WORKDIR /usr/src
+EOF
+
+                        # 2. بناء حاوية السونار الخاصة بالمشروع متضمنة الكود الفعلي
+                        docker build -t local-sonar-scanner -f SonarDockerfile .
+
+                        # 3. تشغيل الفحص من داخل الحاوية مباشرة بدون عمل Volume Mount
                         docker run --rm \
                           --net=host \
                           -e SONAR_HOST_URL=${SONAR_URL} \
                           -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
-                          -v /var/run/docker.sock:/var/run/docker.sock \
-                          sonarsource/sonar-scanner-cli:latest \
+                          local-sonar-scanner \
                           -Dsonar.projectKey=e-commerce \
                           -Dsonar.projectName=e-commerce \
                           -Dsonar.sources=. \
-                          -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**" \
-                          -Dsonar.verbose=true
+                          -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+
+                        # 4. تنظيف الحاوية المؤقتة والملف
+                        docker rmi local-sonar-scanner || true
+                        rm -f SonarDockerfile
                     '''
                 }
             }
