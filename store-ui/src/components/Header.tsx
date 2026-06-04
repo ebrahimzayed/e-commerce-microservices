@@ -1,16 +1,17 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAppSelector } from '../hooks/redux-hooks';
+import { useSelector } from 'react-redux';
 
 const Header = () => {
   const navigate = useNavigate();
-  const { cartItems } = useAppSelector((state) => state.cart);
-  const { count } = useAppSelector((state) => state.theme);
+  
+  // قراءة السلة والثيم مباشرة بدون استخدام custom hooks
+  const cartItems = useSelector((state: any) => state.cart?.cartItems || []);
 
-  const totalQuantity = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+  const totalQuantity = cartItems.reduce((acc: number, item: any) => acc + item.quantity, 0);
 
   return (
-    <header className={`bg-blue-600 text-white shadow-md p-4 sticky top-0 z-50`}>
+    <header className="bg-blue-600 text-white shadow-md p-4 sticky top-0 z-50">
       <div className="container mx-auto flex justify-between items-center">
         <Link to="/" className="text-2xl font-bold flex items-center space-x-2">
           <span>🛍️</span>
