@@ -25,22 +25,18 @@ pipeline {
             steps {
                 withSonarQubeEnv('sonarqube') {
                     sh '''
-                        # 1. إعطاء صلاحيات كاملة للمجلد لكسر أي قيود قراءة على سيرفر اللينكس
-                        chmod -R 777 .
-                        
-                        # 2. تشغيل الحاوية بصلاحيات الـ root لضمان قراءة وفحص كل المجلدات
+                        # تشغيل السكنر كـ container وتمرير متغيرات السيرفر مباشرة مع فحص الـ Current Directory
                         docker run --rm \
-                          --user root \
+                          --net=host \
                           -e SONAR_HOST_URL=${SONAR_URL} \
                           -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
-                          -v "${WORKSPACE}":/usr/src \
-                          -w /usr/src \
+                          -v /var/run/docker.sock:/var/run/docker.sock \
                           sonarsource/sonar-scanner-cli:latest \
                           -Dsonar.projectKey=e-commerce \
                           -Dsonar.projectName=e-commerce \
-                          -Dsonar.sources=/usr/src \
-                          -Dsonar.projectBaseDir=/usr/src \
-                          -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+                          -Dsonar.sources=. \
+                          -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**" \
+                          -Dsonar.verbose=true
                     '''
                 }
             }
