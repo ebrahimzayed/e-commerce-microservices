@@ -35,7 +35,7 @@ EOF
                         # 2. بناء حاوية السونار الخاصة بالمشروع متضمنة الكود الفعلي
                         docker build -t local-sonar-scanner -f SonarDockerfile .
 
-                        # 3. تشغيل الفحص من داخل الحاوية مباشرة بدون عمل Volume Mount
+                        # 3. تشغيل الفحص مع إضافة باراميتر الجافا لتخطي خطأ الـ binaries
                         docker run --rm \
                           --net=host \
                           -e SONAR_HOST_URL=${SONAR_URL} \
@@ -44,6 +44,7 @@ EOF
                           -Dsonar.projectKey=e-commerce \
                           -Dsonar.projectName=e-commerce \
                           -Dsonar.sources=. \
+                          -Dsonar.java.binaries=. \
                           -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
 
                         # 4. تنظيف الحاوية المؤقتة والملف
@@ -235,6 +236,6 @@ EOF
                     Status: FAILURE ❌
                     Check details: ${BUILD_URL}
                  """
+                }
         }
-    }
 }
