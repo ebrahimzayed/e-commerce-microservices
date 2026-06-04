@@ -19,6 +19,7 @@ import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useNavigate } from "react-router-dom";
 import Link from '@mui/material/Link';
+import { getCart } from '../../api/cart';
 
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -50,7 +51,6 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
   color: 'inherit',
   '& .MuiInputBase-input': {
     padding: theme.spacing(1, 1, 1, 0),
-    // vertical padding + font size from searchIcon
     paddingLeft: `calc(1em + ${theme.spacing(4)})`,
     transition: theme.transitions.create('width'),
     width: '100%',
@@ -64,53 +64,45 @@ export default function PrimarySearchAppBar() {
 
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [cartCount, setCartCount] = React.useState(0);
+
   const handleSearch = (e: any) => {
     if (e.key === 'Enter' && searchQuery.trim()) {
       navigate('/search?q=' + searchQuery);
     }
   };
 
+  React.useEffect(() => {
+    const loadCartCount = async () => {
+      try {
+        const cart = await getCart();
+        const total = cart?.items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
+        setCartCount(total);
+      } catch (err) {
+        setCartCount(0);
+      }
+    };
+    loadCartCount();
+    const interval = setInterval(loadCartCount, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-  const [mobileMoreAnchorEl, setMobileMoreAnchorEl] =
-    React.useState<null | HTMLElement>(null);
+  const [mobileMoreAnchorEl, setMobileMoreAnchorEl] = React.useState<null | HTMLElement>(null);
 
   const isMenuOpen = Boolean(anchorEl);
   const isMobileMenuOpen = Boolean(mobileMoreAnchorEl);
 
-  const handleProfileMenuOpen = (event: any) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMobileMenuClose = () => {
-    setMobileMoreAnchorEl(null);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    handleMobileMenuClose();
-  };
-
-  const handleMobileMenuOpen = (event: any) => {
-    setMobileMoreAnchorEl(event.currentTarget);
-  };
+  const handleProfileMenuOpen = (event: any) => setAnchorEl(event.currentTarget);
+  const handleMobileMenuClose = () => setMobileMoreAnchorEl(null);
+  const handleMenuClose = () => { setAnchorEl(null); handleMobileMenuClose(); };
+  const handleMobileMenuOpen = (event: any) => setMobileMoreAnchorEl(event.currentTarget);
 
   const menuId = 'primary-search-account-menu';
   const renderMenu = (
-    <Menu
-      anchorEl={anchorEl}
-      anchorOrigin={{
-        vertical: 'top',
-        horizontal: 'right',
-      }}
-      id={menuId}
-      keepMounted
-      transformOrigin={{
-        vertical: 'top',
-        horizontal: 'right',
-      }}
-      open={isMenuOpen}
-      onClose={handleMenuClose}
-    >
+    <Menu anchorEl={anchorEl} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      id={menuId} keepMounted transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      open={isMenuOpen} onClose={handleMenuClose}>
       <MenuItem onClick={handleMenuClose}>Profile</MenuItem>
       <MenuItem onClick={handleMenuClose}>My account</MenuItem>
     </Menu>
@@ -120,12 +112,7 @@ export default function PrimarySearchAppBar() {
   const colorMode = React.useContext(ThemeContext);
 
   const renderThemeToggle = (
-    <Box
-      sx={{
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
+    <Box sx={{ alignItems: 'center', justifyContent: 'center' }}>
       Switch theme
       <IconButton sx={{ ml: 0 }} onClick={colorMode.toggleColorMode} color="inherit">
         {theme.palette.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
@@ -135,41 +122,19 @@ export default function PrimarySearchAppBar() {
 
   const mobileMenuId = 'primary-search-account-menu-mobile';
   const renderMobileMenu = (
-    <Menu
-      anchorEl={mobileMoreAnchorEl}
-      anchorOrigin={{
-        vertical: 'top',
-        horizontal: 'right',
-      }}
-      id={mobileMenuId}
-      keepMounted
-      transformOrigin={{
-        vertical: 'top',
-        horizontal: 'right',
-      }}
-      open={isMobileMenuOpen}
-      onClose={handleMobileMenuClose}
-    >
+    <Menu anchorEl={mobileMoreAnchorEl} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      id={mobileMenuId} keepMounted transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      open={isMobileMenuOpen} onClose={handleMobileMenuClose}>
       <MenuItem>
-        <IconButton
-          size="large"
-          aria-label="show 17 new notifications"
-          color="inherit"
-        >
-          <Badge badgeContent={17} color="error">
+        <IconButton size="large" color="inherit" onClick={() => navigate('/cart')}>
+          <Badge badgeContent={cartCount} color="error">
             <ShoppingCartIcon />
           </Badge>
         </IconButton>
-        <Typography>Notifications</Typography>
+        <Typography>Cart</Typography>
       </MenuItem>
       <MenuItem onClick={handleProfileMenuOpen}>
-        <IconButton
-          size="large"
-          aria-label="account of current user"
-          aria-controls="primary-search-account-menu"
-          aria-haspopup="true"
-          color="inherit"
-        >
+        <IconButton size="large" color="inherit">
           <AccountCircle />
         </IconButton>
         <Typography>Profile</Typography>
@@ -181,18 +146,10 @@ export default function PrimarySearchAppBar() {
     <Box sx={{ flexGrow: 1 }}>
       <AppBar position="static">
         <Toolbar>
-          <IconButton
-            size="large"
-            edge="start"
-            color="inherit"
-            aria-label="open drawer"
-            sx={{ mr: 2 }}
-          >
+          <IconButton size="large" edge="start" color="inherit" sx={{ mr: 2 }}>
             <MenuIcon />
-
           </IconButton>
-          <Link href="/" variant="h5" underline="none"
-            noWrap
+          <Link href="/" variant="h5" underline="none" noWrap
             sx={{ color: 'white', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
             <img src="logo.png" width="32" height="32" alt="logo" />
             &nbsp;e-commerce store
@@ -200,9 +157,7 @@ export default function PrimarySearchAppBar() {
           <Box sx={{ flexGrow: 1 }} />
           <Box sx={{ width: '45%' }}>
             <Search>
-              <SearchIconWrapper>
-                <SearchIcon />
-              </SearchIconWrapper>
+              <SearchIconWrapper><SearchIcon /></SearchIconWrapper>
               <StyledInputBase
                 placeholder="Search for products ..."
                 inputProps={{ 'aria-label': 'search' }}
@@ -215,36 +170,19 @@ export default function PrimarySearchAppBar() {
           <Box sx={{ flexGrow: 1 }} />
           {renderThemeToggle}
           <Box sx={{ display: { xs: 'none', md: 'flex' } }}>
-            <IconButton
-              size="large"
-              edge="end"
-              aria-label="account of current user"
-              aria-controls={menuId}
-              aria-haspopup="true"
-              onClick={handleProfileMenuOpen}
-              color="inherit"
-            >
+            <IconButton size="large" edge="end" aria-controls={menuId}
+              aria-haspopup="true" onClick={handleProfileMenuOpen} color="inherit">
               <AccountCircle />
             </IconButton>
-            <IconButton
-              size="large"
-              aria-label="1 item in your shopping cart"
-              color="inherit"
-            >
-              <Badge badgeContent={1} color="error">
+            <IconButton size="large" color="inherit" onClick={() => navigate('/cart')}>
+              <Badge badgeContent={cartCount} color="error">
                 <ShoppingCartIcon />
               </Badge>
             </IconButton>
           </Box>
           <Box sx={{ display: { xs: 'flex', md: 'none' } }}>
-            <IconButton
-              size="large"
-              aria-label="show more"
-              aria-controls={mobileMenuId}
-              aria-haspopup="true"
-              onClick={handleMobileMenuOpen}
-              color="inherit"
-            >
+            <IconButton size="large" aria-controls={mobileMenuId}
+              aria-haspopup="true" onClick={handleMobileMenuOpen} color="inherit">
               <MoreIcon />
             </IconButton>
           </Box>
@@ -252,6 +190,6 @@ export default function PrimarySearchAppBar() {
       </AppBar>
       {renderMobileMenu}
       {renderMenu}
-    </Box >
+    </Box>
   );
 }
