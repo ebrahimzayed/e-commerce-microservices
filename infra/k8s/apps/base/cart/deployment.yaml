@@ -13,24 +13,39 @@ spec:
     spec:
       containers:
       - name: cart
-        image: cart:latest
-        imagePullPolicy: IfNotPresent
+        image: 429104603739.dkr.ecr.us-east-2.amazonaws.com/cart:latest
+        imagePullPolicy: Always
         env:
-        - name: SPRING_REDIS_HOST  ## Define the name of the variable
+        - name: SPRING_REDIS_HOST
           valueFrom:
             configMapKeyRef:
-              name: cart-configmap   ## This must match the name of the configmap
-              key: SPRING_REDIS_HOST  ## The key to fetch
-        - name: SPRING_REDIS_PASSWORD  ## Define the name of the variable
+              name: cart-configmap
+              key: SPRING_REDIS_HOST
+        - name: SPRING_REDIS_PASSWORD
           valueFrom:
             configMapKeyRef:
-              name: cart-configmap   ## This must match the name of the configmap
-              key: SPRING_REDIS_PASSWORD  ## The key to fetch
-        - name: SPRING_REDIS_PORT  ## Define the name of the variable
+              name: cart-configmap
+              key: SPRING_REDIS_PASSWORD
+        - name: SPRING_REDIS_PORT
           valueFrom:
             configMapKeyRef:
-              name: cart-configmap   ## This must match the name of the configmap
-              key: SPRING_REDIS_PORT  ## The key to fetch
+              name: cart-configmap
+              key: SPRING_REDIS_PORT
+        - name: SPRING_DATA_REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: cart-configmap
+              key: SPRING_DATA_REDIS_HOST
+        - name: SPRING_DATA_REDIS_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: cart-configmap
+              key: SPRING_DATA_REDIS_PASSWORD
+        - name: SPRING_DATA_REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: cart-configmap
+              key: SPRING_DATA_REDIS_PORT
         ports:
         - name: http
           containerPort: 8080
