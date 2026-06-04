@@ -23,9 +23,25 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                // استدعاء أداة السونار المحلية المثبتة في جينكنز مباشرة لقراءة الـ Workspace الفعلي
                 withSonarQubeEnv('sonarqube') {
-                    sh 'sonar-scanner -Dsonar.projectKey=e-commerce -Dsonar.projectName=e-commerce -Dsonar.sources=. -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"'
+                    sh '''
+                        # 1. إعطاء صلاحيات كاملة للمجلد لكسر أي قيود قراءة على سيرفر اللينكس
+                        chmod -R 777 .
+                        
+                        # 2. تشغيل الحاوية بصلاحيات الـ root لضمان قراءة وفحص كل المجلدات
+                        docker run --rm \
+                          --user root \
+                          -e SONAR_HOST_URL=${SONAR_URL} \
+                          -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
+                          -v "${WORKSPACE}":/usr/src \
+                          -w /usr/src \
+                          sonarsource/sonar-scanner-cli:latest \
+                          -Dsonar.projectKey=e-commerce \
+                          -Dsonar.projectName=e-commerce \
+                          -Dsonar.sources=/usr/src \
+                          -Dsonar.projectBaseDir=/usr/src \
+                          -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+                    '''
                 }
             }
         }
