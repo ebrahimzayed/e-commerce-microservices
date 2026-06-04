@@ -29,10 +29,12 @@ pipeline {
                           -e SONAR_HOST_URL=${SONAR_URL} \
                           -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
                           -v $(pwd):/usr/src \
+                          -w /usr/src \
                           sonarsource/sonar-scanner-cli:latest \
                           -Dsonar.projectKey=e-commerce \
-                          -Dsonar.projectBaseDir=/usr/src \
+                          -Dsonar.projectName=e-commerce \
                           -Dsonar.sources=. \
+                          -Dsonar.projectBaseDir=/usr/src \
                           -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
                     '''
                 }
