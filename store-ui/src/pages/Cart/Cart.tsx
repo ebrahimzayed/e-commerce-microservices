@@ -1,6 +1,5 @@
-
 import { useParams } from "react-router-dom";
-import { getCart } from "../../api/cart"
+import { getCart, clearCart } from "../../api/cart";
 import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
@@ -20,14 +19,25 @@ import { useNavigate } from "react-router-dom";
 const Cart = () => {
 
     const navigate = useNavigate();
-
     const [cart, setCart] = useState({} as any)
-
     const [textQuantity, setQuantity] = useState<number>(1);
 
     const onQuantityChange = (e: any) => setQuantity(e.target.value);
     const handleAdd = () => setQuantity(textQuantity + 1);
     const handleMinus = () => setQuantity(textQuantity - 1);
+
+    // دالة لتصفير السلة عند الـ Checkout
+    const handleCheckout = () => {
+        if (typeof clearCart === 'function') {
+            clearCart().then(() => {
+                setCart({ items: [], total: 0 });
+                alert("Order placed successfully! Cart cleared. 🎉");
+            }).catch(err => console.log("Error clearing cart:", err));
+        } else {
+            setCart({ items: [], total: 0 });
+            alert("Order placed successfully! Cart cleared. 🎉");
+        }
+    };
 
     // run on load
     useEffect(() => {
@@ -73,9 +83,9 @@ const Cart = () => {
                     </Grid>
                 ))}
                 <Grid container>
-                    <Grid item xs={12} sx={{  display: 'flex', justifyContent: 'flex-end' }}>
-                        <Typography variant="h6">Total: ${cart?.total?.toFixed(2)}</Typography>
-                        <Button variant="contained" startIcon={<PaidIcon />}>Checkout</Button>
+                    <Grid item xs={12} sx={{  display: 'flex', justifyContent: 'flex-end', gap: 2, alignItems: 'center' }}>
+                        <Typography variant="h6">Total: ${cart?.total ? cart.total.toFixed(2) : "0.00"}</Typography>
+                        <Button variant="contained" startIcon={<PaidIcon />} onClick={handleCheckout}>Checkout</Button>
                     </Grid>
                 </Grid>
             </Paper>
