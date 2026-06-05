@@ -46,48 +46,42 @@ const Deals = () => {
         navigate('/cart');
     };
 
-    useEffect(() => {
-        loadDeals()
-    }, [])
+    useEffect(() => { loadDeals() }, [])
 
     return (
         <Paper elevation={3} sx={{ pl: 2, pb: 2 }}>
             <Typography variant="h6" sx={{ p: 1, color: 'text.primary' }}>Deals of the Day</Typography>
             <Grid container spacing={2}>
                 <>
-                    {
-                        deals.slice(0, 70).map((deal: any) => (
-                            <Grid item key={deal.dealId}>
-                                <Card sx={{ width: 250, height: 290 }}>
-                                    <Link component="button"
-                                        onClick={() => navigate('product/' + deal.variantSku)}
-                                        underline="none" sx={{ display: 'block', width: '100%' }}>
-                                        <Box><img src={deal.thumbnail} height="150" alt={deal.name} /></Box>
-                                        <CardContent sx={{ height: 50 }}>
-                                            <Typography color="text.secondary">
-                                                {deal.shortDescription}
-                                            </Typography>
-                                        </CardContent>
-                                    </Link>
-                                    <CardActions>
-                                        <Grid container>
-                                            <Grid item xs={5} sx={{ p: 1, display: 'flex', alignItems: 'center' }}>
-                                                <Typography variant="h6">$ {deal.price}</Typography>
-                                            </Grid>
-                                            <Grid item xs={4} sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                                                <Chip icon={<StarIcon />} label={deal.rating} />
-                                            </Grid>
-                                            <Grid item xs={3} sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-                                                <IconButton color="primary" onClick={(e) => handleAddToCart(e, deal)}>
-                                                    <ShoppingCartIcon />
-                                                </IconButton>
-                                            </Grid>
+                    {deals.slice(0, 70).map((deal: any) => (
+                        <Grid item key={deal.dealId}>
+                            <Card sx={{ width: 250, height: 290 }}>
+                                <Link component="button"
+                                    onClick={() => navigate('product/' + deal.variantSku)}
+                                    underline="none" sx={{ display: 'block', width: '100%' }}>
+                                    <Box><img src={deal.thumbnail} height="150" alt={deal.name} /></Box>
+                                    <CardContent sx={{ height: 50 }}>
+                                        <Typography color="text.secondary">{deal.shortDescription}</Typography>
+                                    </CardContent>
+                                </Link>
+                                <CardActions>
+                                    <Grid container>
+                                        <Grid item xs={5} sx={{ p: 1, display: 'flex', alignItems: 'center' }}>
+                                            <Typography variant="h6">$ {deal.price}</Typography>
                                         </Grid>
-                                    </CardActions>
-                                </Card>
-                            </Grid>
-                        ))
-                    }
+                                        <Grid item xs={4} sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                            <Chip icon={<StarIcon />} label={deal.rating} />
+                                        </Grid>
+                                        <Grid item xs={3} sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                            <IconButton color="primary" onClick={(e) => handleAddToCart(e, deal)}>
+                                                <ShoppingCartIcon />
+                                            </IconButton>
+                                        </Grid>
+                                    </Grid>
+                                </CardActions>
+                            </Card>
+                        </Grid>
+                    ))}
                 </>
             </Grid>
         </Paper>
