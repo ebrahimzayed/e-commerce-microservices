@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -38,35 +39,38 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonarqube') {
-                    sh '''
-                        # 1. إنشاء Dockerfile مؤقت يقوم بنسخ الكود كاملاً لداخل الحاوية
-                        cat << 'EOF' > SonarDockerfile
-                        FROM sonarsource/sonar-scanner-cli:latest
-                        COPY . /usr/src
-                        WORKDIR /usr/src
+                /* حوطنا السونار هنا بـ catchError عشان لو مقدرش يوصل للـ Local IP يكمل الـ Pipeline عادي */
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    withSonarQubeEnv('sonarqube') {
+                        sh '''
+                            # 1. إنشاء Dockerfile مؤقت يقوم بنسخ الكود كاملاً لداخل الحاوية
+                            cat << 'EOF' > SonarDockerfile
+                            FROM sonarsource/sonar-scanner-cli:latest
+                            COPY . /usr/src
+                            WORKDIR /usr/src
 EOF
 
-                        # 2. بناء حاوية السونار الخاصة بالمشروع متضمنة الكود الفعلي
-                        docker build -t local-sonar-scanner -f SonarDockerfile .
+                            # 2. بناء حاوية السونار الخاصة بالمشروع متضمنة الكود الفعلي
+                            docker build -t local-sonar-scanner -f SonarDockerfile .
 
-                        # 3. تشغيل الفحص مع تعطيل الـ SCM لقراءة إجمالي الأسطر في الـ Dashboard
-                        docker run --rm \
-                          --net=host \
-                          -e SONAR_HOST_URL=${SONAR_URL} \
-                          -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
-                          local-sonar-scanner \
-                          -Dsonar.projectKey=e-commerce \
-                          -Dsonar.projectName=e-commerce \
-                          -Dsonar.sources=. \
-                          -Dsonar.java.binaries=. \
-                          -Dsonar.scm.disabled=true \
-                          -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+                            # 3. تشغيل الفحص مع تعطيل الـ SCM لقراءة إجمالي الأسطر في الـ Dashboard
+                            docker run --rm \
+                              --net=host \
+                              -e SONAR_HOST_URL=${SONAR_URL} \
+                              -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
+                              local-sonar-scanner \
+                              -Dsonar.projectKey=e-commerce \
+                              -Dsonar.projectName=e-commerce \
+                              -Dsonar.sources=. \
+                              -Dsonar.java.binaries=. \
+                              -Dsonar.scm.disabled=true \
+                              -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
 
-                        # 4. تنظيف الحاوية المؤقتة والملف
-                        docker rmi local-sonar-scanner || true
-                        rm -f SonarDockerfile
-                    '''
+                            # 4. تنظيف الحاوية المؤقتة والملف
+                            docker rmi local-sonar-scanner || true
+                            rm -f SonarDockerfile
+                        '''
+                    }
                 }
             }
         }
