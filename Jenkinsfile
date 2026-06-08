@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -8,7 +7,8 @@ pipeline {
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
-        SONAR_URL       = "http://192.168.148.130:9001"
+        /* تم التحديث برابط الـ LoadBalancer الجديد على AWS وبورت 9000 */
+        SONAR_URL       = "http://a86e754cfcd4c49cc8e23a9d553ae4bc-600022590.us-east-2.elb.amazonaws.com:9000"
     }
 
     stages {
@@ -39,38 +39,35 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                /* حوطنا السونار هنا بـ catchError عشان لو مقدرش يوصل للـ Local IP يكمل الـ Pipeline عادي */
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    withSonarQubeEnv('sonarqube') {
-                        sh '''
-                            # 1. إنشاء Dockerfile مؤقت يقوم بنسخ الكود كاملاً لداخل الحاوية
-                            cat << 'EOF' > SonarDockerfile
-                            FROM sonarsource/sonar-scanner-cli:latest
-                            COPY . /usr/src
-                            WORKDIR /usr/src
+                withSonarQubeEnv('sonarqube') {
+                    sh '''
+                        # 1. إنشاء Dockerfile مؤقت يقوم بنسخ الكود كاملاً لداخل الحاوية
+                        cat << 'EOF' > SonarDockerfile
+                        FROM sonarsource/sonar-scanner-cli:latest
+                        COPY . /usr/src
+                        WORKDIR /usr/src
 EOF
 
-                            # 2. بناء حاوية السونار الخاصة بالمشروع متضمنة الكود الفعلي
-                            docker build -t local-sonar-scanner -f SonarDockerfile .
+                        # 2. بناء حاوية السونار الخاصة بالمشروع متضمنة الكود الفعلي
+                        docker build -t local-sonar-scanner -f SonarDockerfile .
 
-                            # 3. تشغيل الفحص مع تعطيل الـ SCM لقراءة إجمالي الأسطر في الـ Dashboard
-                            docker run --rm \
-                              --net=host \
-                              -e SONAR_HOST_URL=${SONAR_URL} \
-                              -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
-                              local-sonar-scanner \
-                              -Dsonar.projectKey=e-commerce \
-                              -Dsonar.projectName=e-commerce \
-                              -Dsonar.sources=. \
-                              -Dsonar.java.binaries=. \
-                              -Dsonar.scm.disabled=true \
-                              -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+                        # 3. تشغيل الفحص مع تعطيل الـ SCM لقراءة إجمالي الأسطر في الـ Dashboard
+                        docker run --rm \
+                          --net=host \
+                          -e SONAR_HOST_URL=${SONAR_URL} \
+                          -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
+                          local-sonar-scanner \
+                          -Dsonar.projectKey=e-commerce \
+                          -Dsonar.projectName=e-commerce \
+                          -Dsonar.sources=. \
+                          -Dsonar.java.binaries=. \
+                          -Dsonar.scm.disabled=true \
+                          -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
 
-                            # 4. تنظيف الحاوية المؤقتة والملف
-                            docker rmi local-sonar-scanner || true
-                            rm -f SonarDockerfile
-                        '''
-                    }
+                        # 4. تنظيف الحاوية المؤقتة والملف
+                        docker rmi local-sonar-scanner || true
+                        rm -f SonarDockerfile
+                    '''
                 }
             }
         }
