@@ -1,14 +1,10 @@
-import { useParams } from "react-router-dom";
-import { getCart } from "../../api/cart"; // 👈 شيلنا clearCart من هنا عشان م تضربش
+import { getCart, clearCart } from "../../api/cart";
 import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import { Typography } from '@mui/material';
 import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
-import StarIcon from '@mui/icons-material/Star';
-import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import PaidIcon from '@mui/icons-material/Paid';
 import RemoveCircleIcon from '@mui/icons-material/RemoveCircle';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
@@ -26,13 +22,12 @@ const Cart = () => {
     const handleAdd = () => setQuantity(textQuantity + 1);
     const handleMinus = () => setQuantity(textQuantity - 1);
 
-    // تصفير السلة في الـ Frontend مباشرة لحين كرتها في الـ API
-    const handleCheckout = () => {
+    const handleCheckout = async () => {
+        await clearCart();
         setCart({ items: [], total: 0 });
         alert("Order placed successfully! Cart cleared. 🎉");
     };
 
-    // run on load
     useEffect(() => {
         getCart().then((cart) => {
             console.log(cart)
@@ -49,10 +44,8 @@ const Cart = () => {
                             <Typography variant="h6">{item?.title}</Typography>
                         </Grid>
                         <Grid item xs={4}>
-                            <Typography></Typography>
                             <Grid item>
-                                <IconButton color="primary" aria-label="decrement" component="span"
-                                    onClick={handleMinus}>
+                                <IconButton color="primary" onClick={handleMinus}>
                                     <RemoveCircleIcon />
                                 </IconButton>
                                 <TextField
@@ -64,8 +57,7 @@ const Cart = () => {
                                     onChange={onQuantityChange}
                                     value={item?.quantity}
                                 />
-                                <IconButton color="primary" aria-label="increment" component="span"
-                                    onClick={handleAdd}>
+                                <IconButton color="primary" onClick={handleAdd}>
                                     <AddCircleIcon />
                                 </IconButton>
                             </Grid>
@@ -76,13 +68,13 @@ const Cart = () => {
                     </Grid>
                 ))}
                 <Grid container>
-                    <Grid item xs={12} sx={{  display: 'flex', justifyContent: 'flex-end', gap: 2, alignItems: 'center' }}>
+                    <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, alignItems: 'center' }}>
                         <Typography variant="h6">Total: ${cart?.total ? cart.total.toFixed(2) : "0.00"}</Typography>
                         <Button variant="contained" startIcon={<PaidIcon />} onClick={handleCheckout}>Checkout</Button>
                     </Grid>
                 </Grid>
             </Paper>
-        </Box >
+        </Box>
     )
 }
 

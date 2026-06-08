@@ -2,11 +2,9 @@ import axiosClient, { cartUrl } from "./config"
 
 const addToCart = async (item: any) => {
     try {
-        // جيب الـ cart الحالي الأول
         const currentCart = await getCart();
         const existingItems = currentCart?.items || [];
         
-        // شوف لو المنتج موجود زود الكمية
         const existingItem = existingItems.find((i: any) => i.sku === item?.sku);
         let newItems;
         if (existingItem) {
@@ -25,7 +23,6 @@ const addToCart = async (item: any) => {
                 currency: item?.currency
             }];
         }
-
         const response = await axiosClient.post(cartUrl + 'cart', {
             customerId: "john@example.com",
             items: newItems
@@ -42,6 +39,18 @@ export const getCart = async () => {
         return response.data
     } catch (err: any) {
         console.log(err)
+    }
+}
+
+export const clearCart = async () => {
+    try {
+        const response = await axiosClient.post(cartUrl + 'cart', {
+            customerId: "john@example.com",
+            items: []
+        });
+        return response.data;
+    } catch (err: any) {
+        console.log(err);
     }
 }
 
