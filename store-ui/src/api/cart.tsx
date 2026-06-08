@@ -46,7 +46,8 @@ export const clearCart = async () => {
     try {
         const response = await axiosClient.post(cartUrl + 'cart', {
             customerId: "john@example.com",
-            items: []
+            items: [],
+            total: 0
         });
         return response.data;
     } catch (err: any) {
