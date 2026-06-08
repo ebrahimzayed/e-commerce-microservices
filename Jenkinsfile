@@ -1,3 +1,5 @@
+
+
 pipeline {
     agent any
 
@@ -7,7 +9,8 @@ pipeline {
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
-        SONAR_URL       = "http://a86e754cfcd4c49cc8e23a9d553ae4bc-600022590.us-east-2.elb.amazonaws.com:9000"
+        /* الرابط الجديد والمخفف للسونار على AWS بعد التجديد */
+        SONAR_URL       = "http://aac7c880091134e2c8660dc9cdac0590-1131011486.us-east-2.elb.amazonaws.com:9000"
     }
 
     stages {
@@ -38,7 +41,6 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                /* حزام الأمان رجعناه عشان يحمي الـ Pipeline لو السونار لسه مجمعش شبكة */
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     withSonarQubeEnv('sonarqube') {
                         sh '''
