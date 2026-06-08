@@ -7,8 +7,8 @@ pipeline {
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
-        /* الرابط الخارجي - جينكينز هيكلمه من AWS مباشرة بدون أي حظر */
-        SONAR_URL       = "http://aac7c880091134e2c8660dc9cdac0590-1131011486.us-east-2.elb.amazonaws.com:9000"
+        /* الرابط الداخلي المباشر بالأرقام */
+        SONAR_URL       = "http://172.20.103.138:9000"
     }
 
     stages {
@@ -52,8 +52,9 @@ EOF
                             # 2. بناء حاوية السونار 
                             docker build -t local-sonar-scanner -f SonarDockerfile .
 
-                            # 3. تشغيل الفحص عبر الشبكة الخارجية (تم إزالة --net=host لحل مشكلة الـ DNS)
+                            # 3. تشغيل الفحص باستخدام الـ Cluster IP المباشر و الـ host network لضمان الربط
                             docker run --rm \
+                              --net=host \
                               -e SONAR_HOST_URL=${SONAR_URL} \
                               -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
                               local-sonar-scanner \
@@ -149,15 +150,12 @@ EOF
                     sh '''
                         aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
 
-                        # إنشاء الـ namespaces لو مش موجودين
                         kubectl get namespace e-commerce || kubectl create namespace e-commerce
                         kubectl get namespace shared-services || kubectl create namespace shared-services
 
-                        # deploy الـ shared services
                         kubectl apply -f infra/k8s/shared-services/base/redis/ -n shared-services || true
                         kubectl apply -f infra/k8s/shared-services/base/mongodb/ -n shared-services || true
 
-                        # إنشاء الـ configmaps لو مش موجودين
                         kubectl get configmap cart-configmap -n e-commerce || \
                         kubectl create configmap cart-configmap \
                             --from-literal=SPRING_REDIS_HOST=redis-service.shared-services.svc.cluster.local \
@@ -179,14 +177,12 @@ EOF
                             --from-literal=ELASTIC_URL=http://elasticsearch-service.shared-services.svc.cluster.local:9200 \
                             -n e-commerce
 
-                        # deploy الـ apps
                         kubectl apply -f infra/k8s/apps/base/cart/ -n e-commerce || true
                         kubectl apply -f infra/k8s/apps/base/products/ -n e-commerce || true
                         kubectl apply -f infra/k8s/apps/base/search/ -n e-commerce || true
                         kubectl apply -f infra/k8s/apps/base/users/ -n e-commerce || true
                         kubectl apply -f infra/k8s/apps/base/store-ui/ -n e-commerce || true
 
-                        # expose الـ services المطلوبة للـ store-ui
                         kubectl get svc products-api -n e-commerce || \
                             kubectl expose deployment products-deployment --name=products-api --port=5000 --target-port=5000 -n e-commerce
                         kubectl get svc cart-api -n e-commerce || \
@@ -196,7 +192,6 @@ EOF
                         kubectl get svc users-api -n e-commerce || \
                             kubectl expose deployment users-deployment --name=users-api --port=9090 --target-port=9090 -n e-commerce
 
-                        # update الـ images
                         kubectl set image deployment/cart-deployment \
                             cart=${ECR_REGISTRY}/cart:${IMAGE_TAG} -n e-commerce
                         kubectl set image deployment/products-deployment \
@@ -254,3 +249,4 @@ EOF
         }
     }
 }
+
