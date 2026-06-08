@@ -7,7 +7,8 @@ pipeline {
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
-        SONAR_URL       = "http://aac7c880091134e2c8660dc9cdac0590-1131011486.us-east-2.elb.amazonaws.com:9000"
+        /* الربط المباشر عبر الـ DNS الداخلي للـ Kubernetes لرفع التقارير فوراً */
+        SONAR_URL       = "http://sonarqube-sonarqube.sonarqube.svc.cluster.local:9000"
     }
 
     stages {
@@ -41,17 +42,17 @@ pipeline {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     withSonarQubeEnv('sonarqube') {
                         sh '''
-                            # 1. إنشاء Dockerfile مؤقت
+                            # 1. إنشاء Dockerfile مؤقت لحاوية الفحص
                             cat << 'EOF' > SonarDockerfile
                             FROM sonarsource/sonar-scanner-cli:latest
                             COPY . /usr/src
                             WORKDIR /usr/src
 EOF
 
-                            # 2. بناء حاوية السونار 
+                            # 2. بناء حاوية السونار محلياً
                             docker build -t local-sonar-scanner -f SonarDockerfile .
 
-                            # 3. تشغيل الفحص مع إضافة || true لضمان استمرار الـ Pipeline وعدم تعطيله بسبب أمن الشبكات
+                            # 3. تشغيل الفحص الفعلي والربط عبر الشبكة الداخلية لملء الـ Dashboard بالبيانات
                             docker run --rm \
                               -e SONAR_HOST_URL=${SONAR_URL} \
                               -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
@@ -61,9 +62,9 @@ EOF
                               -Dsonar.sources=. \
                               -Dsonar.java.binaries=. \
                               -Dsonar.scm.disabled=true \
-                              -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**" || true
+                              -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
 
-                            # 4. تنظيف الحاوية والملف
+                            # 4. تنظيف الحاوية والملف المؤقت بعد النجاح
                             docker rmi local-sonar-scanner || true
                             rm -f SonarDockerfile
                         '''
