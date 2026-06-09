@@ -2,14 +2,13 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION      = 'eu-west-1' // 👈 تم التحديث لريجون أيرلندا الجديدة بالكامل
+        AWS_REGION      = 'eu-west-1' // 👈 ريجون أيرلندا الجديدة
         AWS_ACCOUNT_ID  = '429104603739'
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
         
-        /* استخدام الـ IPv4 الصريح (127.0.0.1) مع الـ --network host لضمان ربط السكنر بالسيرفر محلياً */
-        /* التوجيه لبورت حاوية السونار الشغالة حالياً على السيرفر برقم 9001 */
+        /* التوجيه لبورت حاوية السونار الشغالة حالياً على السيرفر برقم 9001 عبر الـ Docker Gateway */
         SONAR_URL       = "http://172.17.0.1:9001"
     }
 
@@ -56,7 +55,7 @@ EOF
                                 # 2. بناء حاوية السونار محلياً
                                 docker build -t local-sonar-scanner -f SonarDockerfile .
 
-                                # 3. تشغيل الفحص والربط المباشر مع الـ Host باستخدام الـ 127.0.0.1 والشبكة المحلية
+                                # 3. تشغيل الفحص والربط المباشر مع الـ Host باستخدام الـ Gateway والـ network host
                                 docker run --rm --network host \
                                   -e SONAR_HOST_URL="${SONAR_URL}" \
                                   -e SONAR_TOKEN=${SONAR_AUTH_TOKEN} \
