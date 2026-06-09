@@ -8,8 +8,8 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
         
-        /* تم تحديث الـ IP للـ Docker Gateway الثابت لضمان وصول الحاوية للسونار سيرفر برة الـ Docker Network */
-        SONAR_URL       = "http://172.17.0.1:9000"
+        /* استخدام الـ IPv4 الصريح (127.0.0.1) مع الـ --network host لضمان ربط السكنر بالسيرفر محلياً */
+        SONAR_URL       = "http://127.0.0.1:9000"
     }
 
     stages {
@@ -55,7 +55,7 @@ EOF
                                 # 2. بناء حاوية السونار محلياً
                                 docker build -t local-sonar-scanner -f SonarDockerfile .
 
-                                # 3. تشغيل الفحص والربط المباشر مع الـ Host باستخدام الـ Gateway الافتراضي للـ Docker
+                                # 3. تشغيل الفحص والربط المباشر مع الـ Host باستخدام الـ 127.0.0.1 والشبكة المحلية
                                 docker run --rm --network host \
                                   -e SONAR_HOST_URL="${SONAR_URL}" \
                                   -e SONAR_TOKEN=${SONAR_AUTH_TOKEN} \
