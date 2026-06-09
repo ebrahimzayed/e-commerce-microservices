@@ -8,8 +8,8 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
         
-        /* 1. تم تحديث الرابط ليوجه مباشرة إلى الـ LoadBalancer الخارجي الجديد للسونار */
-        SONAR_URL       = "http://af7b14f3ceffe4fca8b61576dac94418-1894982956.us-east-2.elb.amazonaws.com:9000"
+        /* 1. التوجيه المباشر عبر شبكة الـ Cluster الداخلية لحل مشكلة الـ Network Timeout */
+        SONAR_URL       = "http://sonarqube-service.shared-services.svc.cluster.local:9000"
     }
 
     stages {
@@ -41,7 +41,7 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    /* 2. ربط المرحلة بـ Credentials الخاصة بالسونار داخل الـ Jenkins لقراءة الـ Token بأمان */
+                    /* 2. الـ Credential ID الجديد والصح المتطابق مع الـ Jenkins */
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
                         withSonarQubeEnv('sonarqube') {
                             sh '''
@@ -55,8 +55,8 @@ EOF
                                 # 2. بناء حاوية السونار محلياً
                                 docker build -t local-sonar-scanner -f SonarDockerfile .
 
-                                # 3. تشغيل الفحص والربط عبر الـ LoadBalancer الجديد لملء الـ Dashboard بالبيانات
-                                docker run --rm \
+                                # 3. تشغيل الفحص باستخدام الـ Host Network لربط فوري بالـ Local Cluster
+                                docker run --rm --network host \
                                   -e SONAR_HOST_URL=${SONAR_URL} \
                                   -e SONAR_TOKEN=${SONAR_AUTH_TOKEN} \
                                   local-sonar-scanner \
@@ -167,13 +167,13 @@ EOF
                             --from-literal=SPRING_DATA_REDIS_HOST=redis-service.shared-services.svc.cluster.local \
                             --from-literal=SPRING_DATA_REDIS_PORT=6379 \
                             --from-literal=SPRING_DATA_REDIS_PASSWORD="" \
-                            -n e-commerce
+                            --n e-commerce
 
                         kubectl get configmap products-configmap -n e-commerce || \
                         kubectl create configmap products-configmap \
                             --from-literal=MONGO_URI=mongodb://mongo-service.shared-services.svc.cluster.local:27017 \
                             --from-literal=DATABASE=products \
-                            -n e-commerce
+                            --n e-commerce
 
                         kubectl get configmap search-configmap -n e-commerce || \
                         kubectl create configmap search-configmap \
