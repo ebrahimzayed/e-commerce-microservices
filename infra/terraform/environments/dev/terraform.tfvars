@@ -6,4 +6,4 @@ ami_id = "ami-0490fddec0cbeb88b"
 key_name        = "k8s-key"
 desired_nodes = 2
 min_nodes     = 2
-max_nodes     = 3
+max_nodes     = 4
