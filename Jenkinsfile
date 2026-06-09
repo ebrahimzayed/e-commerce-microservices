@@ -8,8 +8,8 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
         
-        /* 1. استخدام الـ IP المباشر للسيرفر مع بورت السونار لتفادي مشاكل الـ DNS والـ AWS Timeout */
-        SONAR_URL       = "http://192.168.148.130:9000"
+        /* توجيه حاوية الفحص للمضيف مباشرة عبر شبكة الدوكر الداخلية */
+        SONAR_URL       = "http://host.docker.internal:9000"
     }
 
     stages {
@@ -41,7 +41,6 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    /* 2. الـ Credential ID المتطابق تماماً مع الـ Jenkins */
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
                         withSonarQubeEnv('sonarqube') {
                             sh '''
@@ -55,7 +54,7 @@ EOF
                                 # 2. بناء حاوية السونار محلياً
                                 docker build -t local-sonar-scanner -f SonarDockerfile .
 
-                                # 3. تشغيل الفحص والربط عبر الـ IP المباشر المستقر
+                                # 3. تشغيل الفحص والربط عبر كلمة السر المباشرة للمضيف
                                 docker run --rm \
                                   -e SONAR_HOST_URL=${SONAR_URL} \
                                   -e SONAR_TOKEN=${SONAR_AUTH_TOKEN} \
