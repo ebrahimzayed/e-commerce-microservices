@@ -8,8 +8,8 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
         
-        /* توجيه حاوية الفحص للمضيف مباشرة عبر شبكة الدوكر الداخلية */
-        SONAR_URL       = "http://host.docker.internal:9000"
+        /* 1. التوجيه لآي بي السيرفر المستضيف حيث يتم تشغيل الـ Port-Forward على بورت 9000 */
+        SONAR_URL       = "http://192.168.148.130:9000"
     }
 
     stages {
@@ -41,6 +41,7 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    /* 2. استخدام الـ Credential ID الصحيح (sonar-token) المتطابق مع الـ Jenkins */
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
                         withSonarQubeEnv('sonarqube') {
                             sh '''
@@ -54,8 +55,8 @@ EOF
                                 # 2. بناء حاوية السونار محلياً
                                 docker build -t local-sonar-scanner -f SonarDockerfile .
 
-                                # 3. تشغيل الفحص والربط عبر كلمة السر المباشرة للمضيف
-                                docker run --rm \
+                                # 3. تشغيل الفحص باستخدام الـ --network host لرؤية نفق الـ Port-Forward المفتوح
+                                docker run --rm --network host \
                                   -e SONAR_HOST_URL=${SONAR_URL} \
                                   -e SONAR_TOKEN=${SONAR_AUTH_TOKEN} \
                                   local-sonar-scanner \
