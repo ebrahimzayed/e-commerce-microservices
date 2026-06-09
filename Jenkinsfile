@@ -159,6 +159,7 @@ EOF
                         kubectl apply -f infra/k8s/shared-services/base/redis/ -n shared-services || true
                         kubectl apply -f infra/k8s/shared-services/base/mongodb/ -n shared-services || true
 
+                        # 🛠️ تم تعديل الـ Flag هنا من --n لـ -n
                         kubectl get configmap cart-configmap -n e-commerce || \
                         kubectl create configmap cart-configmap \
                             --from-literal=SPRING_REDIS_HOST=redis-service.shared-services.svc.cluster.local \
@@ -167,13 +168,14 @@ EOF
                             --from-literal=SPRING_DATA_REDIS_HOST=redis-service.shared-services.svc.cluster.local \
                             --from-literal=SPRING_DATA_REDIS_PORT=6379 \
                             --from-literal=SPRING_DATA_REDIS_PASSWORD="" \
-                            --n e-commerce
+                            -n e-commerce
 
+                        # 🛠️ تم تعديل الـ Flag هنا من --n لـ -n
                         kubectl get configmap products-configmap -n e-commerce || \
                         kubectl create configmap products-configmap \
                             --from-literal=MONGO_URI=mongodb://mongo-service.shared-services.svc.cluster.local:27017 \
                             --from-literal=DATABASE=products \
-                            --n e-commerce
+                            -n e-commerce
 
                         kubectl get configmap search-configmap -n e-commerce || \
                         kubectl create configmap search-configmap \
