@@ -8,8 +8,8 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
         
-        /* التوجيه لـ localhost لأن السيرفر القديم لغيناه، والـ Port-forward شغال محلياً */
-        SONAR_URL       = "http://localhost:9000"
+        /* تم تحديث الـ IP للـ Docker Gateway الثابت لضمان وصول الحاوية للسونار سيرفر برة الـ Docker Network */
+        SONAR_URL       = "http://172.17.0.1:9000"
     }
 
     stages {
@@ -55,9 +55,9 @@ EOF
                                 # 2. بناء حاوية السونار محلياً
                                 docker build -t local-sonar-scanner -f SonarDockerfile .
 
-                                # 3. تشغيل الفحص باستخدام الـ --network host لرؤية نفق الـ Port-Forward المفتوح
+                                # 3. تشغيل الفحص والربط المباشر مع الـ Host باستخدام الـ Gateway الافتراضي للـ Docker
                                 docker run --rm --network host \
-                                  -e SONAR_HOST_URL=${SONAR_URL} \
+                                  -e SONAR_HOST_URL="${SONAR_URL}" \
                                   -e SONAR_TOKEN=${SONAR_AUTH_TOKEN} \
                                   local-sonar-scanner \
                                   -Dsonar.projectKey=e-commerce \
@@ -151,7 +151,6 @@ EOF
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
                                   credentialsId: 'aws-credentials']]) {
                     sh '''
-                        # تصليح طريقة تشغيل الأوامر بالـ Multi-line block النظيف لتفادي خطأ الـ sh القديم
                         aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
 
                         kubectl get namespace e-commerce || kubectl create namespace e-commerce
