@@ -2,14 +2,14 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION      = 'us-east-2'
+        AWS_REGION      = 'eu-west-1' // 👈 تم التحديث لريجون أيرلندا الجديدة بالكامل
         AWS_ACCOUNT_ID  = '429104603739'
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
         
-        /* 1. التوجيه لآي بي السيرفر المستضيف حيث يتم تشغيل الـ Port-Forward على بورت 9000 */
-        SONAR_URL       = "http://192.168.148.130:9000"
+        /* التوجيه لـ localhost لأن السيرفر القديم لغيناه، والـ Port-forward شغال محلياً */
+        SONAR_URL       = "http://localhost:9000"
     }
 
     stages {
@@ -41,7 +41,7 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    /* 2. استخدام الـ Credential ID الصحيح (sonar-token) المتطابق مع الـ Jenkins */
+                    /* استخدام الـ Credential ID الصحيح (sonar-token) المتطابق مع الـ Jenkins */
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
                         withSonarQubeEnv('sonarqube') {
                             sh '''
@@ -151,6 +151,7 @@ EOF
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
                                   credentialsId: 'aws-credentials']]) {
                     sh '''
+                        # تصليح طريقة تشغيل الأوامر بالـ Multi-line block النظيف لتفادي خطأ الـ sh القديم
                         aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
 
                         kubectl get namespace e-commerce || kubectl create namespace e-commerce
