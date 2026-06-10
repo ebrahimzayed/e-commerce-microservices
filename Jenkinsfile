@@ -8,7 +8,7 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
 
-        // ✅ FIX: استخدام localhost بدل host.docker.internal
+        // SonarQube Local
         SONAR_URL       = "http://localhost:9002"
     }
 
@@ -26,7 +26,6 @@ pipeline {
         stage('Trivy File System Scan') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    echo '🔍 Running Trivy File System Scan...'
                     sh '''
                         trivy fs \
                           --exit-code 0 \
@@ -41,7 +40,7 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
+                    withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_AUTH_TOKEN')]) {
                         sh '''
                             cat << 'EOF' > SonarDockerfile
 FROM sonarsource/sonar-scanner-cli:latest
@@ -229,16 +228,10 @@ EOF
     post {
         success {
             echo '✅ Pipeline succeeded!'
-            mail to: 'ebrahimzayed123456789@gmail.com',
-                 subject: "✅ Pipeline Succeeded - Build #${BUILD_NUMBER}",
-                 body: "Build #${BUILD_NUMBER} succeeded! ${BUILD_URL}"
         }
 
         failure {
             echo '❌ Pipeline failed!'
-            mail to: 'ebrahimzayed123456789@gmail.com',
-                 subject: "❌ Pipeline Failed - Build #${BUILD_NUMBER}",
-                 body: "Build #${BUILD_NUMBER} failed! ${BUILD_URL}"
         }
     }
 }
