@@ -8,8 +8,8 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
 
-        // ✅ تم التعديل: استخدام SonarQube المحلي بدل ELB
-        SONAR_URL       = "http://host.docker.internal:9002"
+        // ✅ FIX: استخدام localhost بدل host.docker.internal
+        SONAR_URL       = "http://localhost:9002"
     }
 
     stages {
