@@ -1,5 +1,5 @@
 resource "aws_security_group" "k8s_sg" {
-  name        = "k8s-security-group"
+  name        = "k8s-security-group-v2"
   description = "Security group for Kubernetes cluster"
   vpc_id      = var.vpc_id
 
@@ -33,8 +33,9 @@ resource "aws_security_group" "k8s_sg" {
 }
 
 resource "aws_instance" "control_plane" {
-  ami                         = var.ami_id
-  instance_type               = "t3.micro"
+  count                       = 0 # 👈 غيري دي لـ 0 عشان نلغي السيرفر ده تماماً
+  ami                         = "ami-0d940f23d5a7efd70"
+  instance_type               = "t3.medium"
   subnet_id                   = var.public_subnet_id
   vpc_security_group_ids      = [aws_security_group.k8s_sg.id]
   key_name                    = var.key_name
@@ -47,9 +48,9 @@ resource "aws_instance" "control_plane" {
 }
 
 resource "aws_instance" "workers" {
-  count                       = 2
-  ami                         = var.ami_id
-  instance_type               = "t3.micro"
+  count                       = 0 # 👈 غيري دي لـ 0 برضه عشان نلغي السيرفرات دي
+  ami                         = "ami-0d940f23d5a7efd70"
+  instance_type               = "t3.medium"
   subnet_id                   = var.public_subnet_id
   vpc_security_group_ids      = [aws_security_group.k8s_sg.id]
   key_name                    = var.key_name

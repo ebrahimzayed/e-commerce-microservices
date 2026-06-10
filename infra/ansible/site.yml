@@ -1,0 +1,82 @@
+---
+- name: E-Commerce DevOps Full Setup
+  hosts: localhost
+  connection: local
+  vars:
+    jenkins_path: ~/Desktop/jenkins-pipeline-test/jenkis-agent
+
+  tasks:
+
+    # ========== Jenkins ==========
+    - name: Start Jenkins
+      shell: docker compose up -d
+      args:
+        chdir: "{{ jenkins_path }}"
+
+    - name: Wait for Jenkins
+      wait_for:
+        host: localhost
+        port: 8080
+        timeout: 60
+
+    # ========== SonarQube ==========
+    - name: Start SonarQube
+      shell: |
+        docker start sonarqube || docker run -d \
+          --name sonarqube \
+          -p 9001:9000 \
+          sonarqube:9.9-community
+
+    - name: Wait for SonarQube
+      wait_for:
+        host: localhost
+        port: 9001
+        timeout: 120
+
+    # ========== Prometheus port-forward ==========
+    - name: Kill old Prometheus port-forward
+      shell: pkill -f "port-forward.*9091" || true
+      ignore_errors: true
+
+    - name: Start Prometheus port-forward
+      shell: >
+        nohup kubectl port-forward svc/monitoring-stack-kube-prom-prometheus
+        -n monitoring 9091:9090 > /tmp/prometheus-pf.log 2>&1 &
+      async: 10
+      poll: 0
+
+    - name: Wait for Prometheus
+      wait_for:
+        host: localhost
+        port: 9091
+        timeout: 60
+
+    # ========== ArgoCD Apps ==========
+    - name: Apply ArgoCD Project
+      shell: kubectl apply -f argocd-project.yaml
+      args:
+        chdir: ~/Desktop/e-commerce-microservices-sample
+
+    - name: Apply ArgoCD E-Commerce App
+      shell: kubectl apply -f argocd-app.yaml
+      args:
+        chdir: ~/Desktop/e-commerce-microservices-sample
+
+    - name: Apply ArgoCD Monitoring App
+      shell: kubectl apply -f argocd-monitoring.yaml
+      args:
+        chdir: ~/Desktop/e-commerce-microservices-sample
+
+    # ========== Print All URLs ==========
+    - name: Print All Services
+      debug:
+        msg:
+          - "===== Local ====="
+          - "Jenkins    → http://localhost:8080"
+          - "SonarQube  → http://localhost:9001"
+          - "Prometheus → http://localhost:9091"
+          - "===== AWS ====="
+          - "ArgoCD     → http://a2a26689a8dff49ff8bd8836337b52e8-1523232964.eu-west-1.elb.amazonaws.com"
+          - "Store-UI   → http://ac377d48eccb04e338bd0b7873c7293e-2067335765.eu-west-1.elb.amazonaws.com"
+          - "Grafana    → http://ab6794f0641cf4593b6c3d4970aaf3b2-421403706.eu-west-1.elb.amazonaws.com"
+          - "SonarQube  → http://a2af8231d1b8b43199b8c82e28abdb86-1523237720.eu-west-1.elb.amazonaws.com:9000"

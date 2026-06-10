@@ -43,5 +43,5 @@ variable "min_nodes" {
 
 variable "max_nodes" {
   type    = number
-  default = 3
+  default = 1
 }

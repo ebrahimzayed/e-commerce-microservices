@@ -9,7 +9,8 @@ pipeline {
         EKS_CLUSTER     = 'ecommerce-eks'
         
         /* التوجيه لبورت حاوية السونار الشغالة حالياً على السيرفر برقم 9001 عبر الـ Docker Gateway */
-        SONAR_URL       = "http://172.17.0.1:9001"
+        /* التوجيه الجديد والمستقر عبر الـ AWS Load Balancer */
+SONAR_URL       = "http://a2af8231d1b8b43199b8c82e28abdb86-1523237720.eu-west-1.elb.amazonaws.com:9000"
     }
 
     stages {

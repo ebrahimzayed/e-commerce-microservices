@@ -25,7 +25,7 @@ module "eks" {
   private_subnet_id  = module.vpc.private_subnet_id
   
   # 1. هربنا من كوتة الـ t3 العادية ورحنا للـ AMD المفتوحة والرخيصة 🎯
-  node_instance_type = "t3a.medium"  
+  node_instance_type = "t3.medium"  
   
   # 2. وسعنا الخناق وخلينا الكلاستر يقوم بـ 2 نودز ويقدر يزيد لـ 3 🔥
   desired_nodes      = 2
