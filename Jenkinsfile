@@ -111,7 +111,6 @@ EOF
             }
         }
 
-        // 🔥 التعديل هنا: تم إضافة --timeout 15m لمنع الـ Trivy من الفشل والتعليق زمنياً
         stage('Trivy Image Scan') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
@@ -175,6 +174,7 @@ EOF
             }
         }
 
+        // 🔥 تم تصحيح الـ Typo هنا والـ Volumes بقت سليمة تماماً لتشغيل أداة الفحص بنجاح
         stage('KubeBench') {
             steps {
                 sh '''
@@ -183,7 +183,7 @@ EOF
                       -v /etc:/etc:ro \
                       -v /var:/var:ro \
                       -v ~/.kube:/root/.kube:ro \
-                      -v  aquasec/kube-bench:latest run --exit-code 0
+                      aquasec/kube-bench:latest run --exit-code 0
                 '''
             }
         }
