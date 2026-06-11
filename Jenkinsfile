@@ -63,6 +63,7 @@ pipeline {
                           -Dsonar.scm.disabled=true \
                           -Dsonar.qualitygate.wait=false \
                           -Dsonar.sources=. \
+                          -Dsonar.java.binaries=. \
                           -Dsonar.exclusions="**/node_modules/**,**/.gradle/**,**/gradle/**,**/.next/**,**/*.jar,**/*.bin,**/build/**,**/target/**"
 
                         echo "Closing the secure tunnel safely..."
