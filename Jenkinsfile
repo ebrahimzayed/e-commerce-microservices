@@ -9,7 +9,7 @@ pipeline {
         EKS_CLUSTER     = 'ecommerce-eks'
 
         // SonarQube Local
-        SONAR_URL       = "http://localhost:9002"
+        SONAR_URL       = "http://localhost:9001"
     }
 
     stages {
