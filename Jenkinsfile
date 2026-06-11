@@ -7,6 +7,9 @@ pipeline {
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
+        
+        // 🚀 استخدام الـ Cluster IP الداخلي والمستقر لتفادي الـ Firewalls والـ Load Balancer تماماً
+        SONAR_URL       = "http://172.20.178.247:9000"
     }
 
     stages {
@@ -29,23 +32,20 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
-                                  credentialsId: 'aws-credentials']]) {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
                         sh '''
+                            echo "Updating Kubeconfig Context..."
                             aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
 
-                            echo "Getting SonarQube LoadBalancer URL..."
-                            SONAR_LB=$(kubectl get svc sonarqube-sonarqube -n sonarqube \
-                                       -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-                            echo "SonarQube URL: http://${SONAR_LB}:9000"
-
-                            echo "Running SonarQube scan..."
+                            echo "Executing Host-Network Docker SonarQube Scan via Internal Cluster IP..."
+                            
+                            # تشغيل الحاوية المدمجة محلياً وربطها بالشبكة الداخلية مباشرة
                             docker run --rm \
                               --network host \
                               -v "${WORKSPACE}":/usr/src \
                               sonarsource/sonar-scanner-cli:latest \
-                              -Dsonar.host.url="http://${SONAR_LB}:9000" \
+                              -Dsonar.host.url="${SONAR_URL}" \
                               -Dsonar.login="$SONAR_AUTH_TOKEN" \
                               -Dsonar.projectKey=e-commerce \
                               -Dsonar.projectName=e-commerce \
@@ -115,8 +115,7 @@ pipeline {
 
         stage('Push to ECR') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
-                                  credentialsId: 'aws-credentials']]) {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                     sh '''
                         aws ecr get-login-password --region ${AWS_REGION} | \
                         docker login --username AWS --password-stdin ${ECR_REGISTRY}
@@ -139,8 +138,7 @@ pipeline {
 
         stage('Deploy to EKS') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
-                                  credentialsId: 'aws-credentials']]) {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                     sh '''
                         aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
 
