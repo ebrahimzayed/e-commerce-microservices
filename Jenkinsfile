@@ -5,10 +5,12 @@ pipeline {
         AWS_REGION      = 'eu-west-1'
         AWS_ACCOUNT_ID  = '429104603739'
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-        IMAGE_TAG       = "${BUILD_NUMBER}"
+
+        // 🔥 FIX: use Git commit instead of build number
+        IMAGE_TAG       = "${env.GIT_COMMIT.take(7)}"
+
         EKS_CLUSTER     = 'ecommerce-eks'
 
-        // SonarQube Local
         SONAR_URL       = "http://localhost:9001"
     }
 
@@ -18,7 +20,9 @@ pipeline {
             steps {
                 checkout scmGit(
                     branches: [[name: '*/main']],
-                    userRemoteConfigs: [[url: 'https://github.com/ebrahimzayed/e-commerce-microservices.git']]
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/ebrahimzayed/e-commerce-microservices.git'
+                    ]]
                 )
             }
         }
@@ -30,8 +34,7 @@ pipeline {
                         trivy fs \
                           --exit-code 0 \
                           --severity HIGH,CRITICAL \
-                          --format table \
-                          .
+                          --format table .
                     '''
                 }
             }
@@ -71,39 +74,49 @@ EOF
 
         stage('Build Images') {
             parallel {
-                stage('Build Cart') {
+
+                stage('Cart') {
                     steps {
                         sh '''
-                            cd ./cart-cna-microservice
+                            cd cart-cna-microservice
                             chmod +x gradlew
                             ./gradlew bootJar -x test
                             cd ..
-                            docker build --no-cache -t ${ECR_REGISTRY}/cart:${IMAGE_TAG} ./cart-cna-microservice
+
+                            docker build -t ${ECR_REGISTRY}/cart:${IMAGE_TAG} ./cart-cna-microservice
                         '''
                     }
                 }
 
-                stage('Build Products') {
+                stage('Products') {
                     steps {
-                        sh 'docker build -t ${ECR_REGISTRY}/products:${IMAGE_TAG} ./products-cna-microservice'
+                        sh '''
+                            docker build -t ${ECR_REGISTRY}/products:${IMAGE_TAG} ./products-cna-microservice
+                        '''
                     }
                 }
 
-                stage('Build Search') {
+                stage('Search') {
                     steps {
-                        sh 'docker build -t ${ECR_REGISTRY}/search:${IMAGE_TAG} ./search-cna-microservice'
+                        sh '''
+                            docker build -t ${ECR_REGISTRY}/search:${IMAGE_TAG} ./search-cna-microservice
+                        '''
                     }
                 }
 
-                stage('Build Users') {
+                stage('Users') {
                     steps {
-                        sh 'docker build -t ${ECR_REGISTRY}/users:${IMAGE_TAG} ./users-cna-microservice'
+                        sh '''
+                            docker build -t ${ECR_REGISTRY}/users:${IMAGE_TAG} ./users-cna-microservice
+                        '''
                     }
                 }
 
-                stage('Build Store UI') {
+                stage('Store UI') {
                     steps {
-                        sh 'docker build -t ${ECR_REGISTRY}/store-ui:${IMAGE_TAG} ./store-ui'
+                        sh '''
+                            docker build -t ${ECR_REGISTRY}/store-ui:${IMAGE_TAG} ./store-ui
+                        '''
                     }
                 }
             }
@@ -113,40 +126,17 @@ EOF
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     sh '''
-                        trivy image --exit-code 0 --severity HIGH,CRITICAL \
-                          --format table \
-                          --cache-dir /var/lib/trivy-cache \
-                          --scanners vuln \
-                          --skip-version-check \
-                          --timeout 15m ${ECR_REGISTRY}/cart:${IMAGE_TAG}
-
-                        trivy image --exit-code 0 --severity HIGH,CRITICAL \
-                          --format table \
-                          --cache-dir /var/lib/trivy-cache \
-                          --scanners vuln \
-                          --skip-version-check \
-                          --timeout 15m ${ECR_REGISTRY}/products:${IMAGE_TAG}
-
-                        trivy image --exit-code 0 --severity HIGH,CRITICAL \
-                          --format table \
-                          --cache-dir /var/lib/trivy-cache \
-                          --scanners vuln \
-                          --skip-version-check \
-                          --timeout 15m ${ECR_REGISTRY}/search:${IMAGE_TAG}
-
-                        trivy image --exit-code 0 --severity HIGH,CRITICAL \
-                          --format table \
-                          --cache-dir /var/lib/trivy-cache \
-                          --scanners vuln \
-                          --skip-version-check \
-                          --timeout 15m ${ECR_REGISTRY}/users:${IMAGE_TAG}
-
-                        trivy image --exit-code 0 --severity HIGH,CRITICAL \
-                          --format table \
-                          --cache-dir /var/lib/trivy-cache \
-                          --scanners vuln \
-                          --skip-version-check \
-                          --timeout 15m ${ECR_REGISTRY}/store-ui:${IMAGE_TAG}
+                        for service in cart products search users store-ui; do
+                            trivy image \
+                              --exit-code 0 \
+                              --severity HIGH,CRITICAL \
+                              --format table \
+                              --cache-dir /var/lib/trivy-cache \
+                              --scanners vuln \
+                              --skip-version-check \
+                              --timeout 15m \
+                              ${ECR_REGISTRY}/${service}:${IMAGE_TAG}
+                        done
                     '''
                 }
             }
@@ -170,7 +160,7 @@ EOF
             }
         }
 
-        stage('Update K8s Manifests') {
+        stage('Deploy to EKS') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
                                   credentialsId: 'aws-credentials']]) {
@@ -180,15 +170,16 @@ EOF
                         kubectl get namespace e-commerce || kubectl create namespace e-commerce
                         kubectl get namespace shared-services || kubectl create namespace shared-services
 
-                        kubectl apply -f infra/k8s/shared-services/base/redis/ -n shared-services || true
-                        kubectl apply -f infra/k8s/shared-services/base/mongodb/ -n shared-services || true
+                        kubectl apply -f infra/k8s/shared-services/base/redis/ -n shared-services
+                        kubectl apply -f infra/k8s/shared-services/base/mongodb/ -n shared-services
 
-                        kubectl apply -f infra/k8s/apps/base/cart/ -n e-commerce || true
-                        kubectl apply -f infra/k8s/apps/base/products/ -n e-commerce || true
-                        kubectl apply -f infra/k8s/apps/base/search/ -n e-commerce || true
-                        kubectl apply -f infra/k8s/apps/base/users/ -n e-commerce || true
-                        kubectl apply -f infra/k8s/apps/base/store-ui/ -n e-commerce || true
+                        kubectl apply -f infra/k8s/apps/base/cart/ -n e-commerce
+                        kubectl apply -f infra/k8s/apps/base/products/ -n e-commerce
+                        kubectl apply -f infra/k8s/apps/base/search/ -n e-commerce
+                        kubectl apply -f infra/k8s/apps/base/users/ -n e-commerce
+                        kubectl apply -f infra/k8s/apps/base/store-ui/ -n e-commerce
 
+                        # 🔥 IMPORTANT: ONLY set image (no latest usage)
                         kubectl set image deployment/cart-deployment \
                             cart=${ECR_REGISTRY}/cart:${IMAGE_TAG} -n e-commerce
 
@@ -204,7 +195,12 @@ EOF
                         kubectl set image deployment/store-ui-deployment \
                             store-ui=${ECR_REGISTRY}/store-ui:${IMAGE_TAG} -n e-commerce
 
-                        kubectl rollout status deployment -n e-commerce --timeout=300s
+                        # 🔥 FIX: explicit rollout per service
+                        kubectl rollout status deployment/cart-deployment -n e-commerce --timeout=300s
+                        kubectl rollout status deployment/products-deployment -n e-commerce --timeout=300s
+                        kubectl rollout status deployment/search-deployment -n e-commerce --timeout=300s
+                        kubectl rollout status deployment/users-deployment -n e-commerce --timeout=300s
+                        kubectl rollout status deployment/store-ui-deployment -n e-commerce --timeout=300s
                     '''
                 }
             }
@@ -227,11 +223,11 @@ EOF
 
     post {
         success {
-            echo '✅ Pipeline succeeded!'
+            echo '✅ Pipeline succeeded'
         }
 
         failure {
-            echo '❌ Pipeline failed!'
+            echo '❌ Pipeline failed'
         }
     }
 }
