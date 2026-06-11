@@ -2,12 +2,11 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION      = 'eu-west-1'
-        AWS_ACCOUNT_ID  = '429104603739'
-        ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-        IMAGE_TAG       = "${BUILD_NUMBER}"
-        EKS_CLUSTER     = 'ecommerce-eks'
-        // حقن الرمز الجديد مباشرة في البيئة لضمان تخطي أي تعليق في الخادم
+        AWS_REGION         = 'eu-west-1'
+        AWS_ACCOUNT_ID     = '429104603739'
+        ECR_REGISTRY       = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        IMAGE_TAG          = "${BUILD_NUMBER}"
+        EKS_CLUSTER        = 'ecommerce-eks'
         SONAR_STATIC_TOKEN = 'squ_4a825171cf51697599473bfb7d31d4f9b4b76587'
     }
 
@@ -47,7 +46,7 @@ pipeline {
                         # انتظار استقرار النفق الخلفي
                         sleep 10
 
-                        echo "Running the scanner directly via Host local network bridge..."
+                        echo "Running targeted source scanner..."
                         docker run --rm \
                           --network host \
                           -v "${WORKSPACE}":/usr/src \
@@ -56,11 +55,11 @@ pipeline {
                           -Dsonar.login="${SONAR_STATIC_TOKEN}" \
                           -Dsonar.projectKey=e-commerce \
                           -Dsonar.projectName=e-commerce \
-                          -Dsonar.sources=. \
-                          -Dsonar.java.binaries=. \
                           -Dsonar.scm.disabled=true \
                           -Dsonar.qualitygate.wait=false \
-                          -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+                          -Dsonar.sources=/usr/src/cart-cna-microservice,/usr/src/products-cna-microservice,/usr/src/search-cna-microservice,/usr/src/users-cna-microservice,/usr/src/store-ui \
+                          -Dsonar.java.binaries=/usr/src \
+                          -Dsonar.exclusions="**/node_modules/**,**/.gradle/**,**/gradle/**,**/.next/**,**/*.jar,**/*.bin,**/build/**,**/target/**"
 
                         echo "Closing the secure tunnel safely..."
                         kill $PF_PID || true
@@ -69,43 +68,29 @@ pipeline {
             }
         }
 
-        stage('Build Images') {
-            parallel {
-                stage('Cart') {
-                    steps {
-                        sh '''
-                            cd cart-cna-microservice
-                            chmod +x gradlew
-                            ./gradlew bootJar -x test
-                            cd ..
-                            docker build -t ${ECR_REGISTRY}/cart:${IMAGE_TAG} -t ${ECR_REGISTRY}/cart:latest cart-cna-microservice
-                        '''
-                    }
-                }
+        // تم تحويلها لبناء متتالي (واحدة تلو الأخرى) لحماية ذاكرة الكلاستر من الاختناق والـ Timeout
+        stage('Build Microservices Images') {
+            steps {
+                echo "Building 1/5: Cart Service..."
+                sh '''
+                    cd cart-cna-microservice
+                    chmod +x gradlew
+                    ./gradlew bootJar -x test
+                    cd ..
+                    docker build -t ${ECR_REGISTRY}/cart:${IMAGE_TAG} -t ${ECR_REGISTRY}/cart:latest cart-cna-microservice
+                '''
 
-                stage('Products') {
-                    steps {
-                        sh 'docker build -t ${ECR_REGISTRY}/products:${IMAGE_TAG} -t ${ECR_REGISTRY}/products:latest products-cna-microservice'
-                    }
-                }
+                echo "Building 2/5: Products Service..."
+                sh 'docker build -t ${ECR_REGISTRY}/products:${IMAGE_TAG} -t ${ECR_REGISTRY}/products:latest products-cna-microservice'
 
-                stage('Search') {
-                    steps {
-                        sh 'docker build -t ${ECR_REGISTRY}/search:${IMAGE_TAG} -t ${ECR_REGISTRY}/search:latest search-cna-microservice'
-                    }
-                }
+                echo "Building 3/5: Search Service..."
+                sh 'docker build -t ${ECR_REGISTRY}/search:${IMAGE_TAG} -t ${ECR_REGISTRY}/search:latest search-cna-microservice'
 
-                stage('Users') {
-                    steps {
-                        sh 'docker build -t ${ECR_REGISTRY}/users:${IMAGE_TAG} -t ${ECR_REGISTRY}/users:latest users-cna-microservice'
-                    }
-                }
+                echo "Building 4/5: Users Service..."
+                sh 'docker build -t ${ECR_REGISTRY}/users:${IMAGE_TAG} -t ${ECR_REGISTRY}/users:latest users-cna-microservice'
 
-                stage('Store UI') {
-                    steps {
-                        sh 'docker build -t ${ECR_REGISTRY}/store-ui:${IMAGE_TAG} -t ${ECR_REGISTRY}/store-ui:latest store-ui'
-                    }
-                }
+                echo "Building 5/5: Store UI..."
+                sh 'docker build -t ${ECR_REGISTRY}/store-ui:${IMAGE_TAG} -t ${ECR_REGISTRY}/store-ui:latest store-ui'
             }
         }
 
