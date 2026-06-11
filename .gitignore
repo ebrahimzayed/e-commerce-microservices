@@ -1,2 +1,8 @@
 .vscode
 .DS_Store*.tar
+*.pem
+*.tgz
+argocd
+trust-policy.json
+pvcs-fresh.yaml
+databases-light.yaml
