@@ -46,10 +46,11 @@ pipeline {
                         # انتظار استقرار النفق الخلفي
                         sleep 10
 
-                        echo "Running deep search source scanner..."
+                        echo "Running fully mapped source scanner..."
                         docker run --rm \
                           --network host \
                           -v "${WORKSPACE}":/usr/src \
+                          -w /usr/src \
                           sonarsource/sonar-scanner-cli:latest \
                           -Dsonar.host.url="http://127.0.0.1:9001" \
                           -Dsonar.login="${SONAR_STATIC_TOKEN}" \
@@ -58,8 +59,7 @@ pipeline {
                           -Dsonar.scm.disabled=true \
                           -Dsonar.qualitygate.wait=false \
                           -Dsonar.sources=. \
-                          -Dsonar.java.binaries=. \
-                          -Dsonar.exclusions="**/node_modules/**,**/.gradle/**,**/gradle/**,**/.next/**,**/*.jar,**/*.bin"
+                          -Dsonar.exclusions="**/node_modules/**,**/.gradle/**,**/gradle/**,**/.next/**,**/*.jar,**/*.bin,**/build/**,**/target/**"
                         
                         echo "Closing the secure tunnel safely..."
                         kill $PF_PID || true
