@@ -46,9 +46,12 @@ pipeline {
                         # انتظار استقرار النفق الخلفي
                         sleep 10
 
-                        echo "Downloading Portable Sonar Scanner CLI directly into Workspace..."
-                        curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
-                        unzip -q sonar-scanner.zip
+                        echo "Checking/Downloading Portable Sonar Scanner CLI directly into Workspace..."
+                        if [ ! -d "sonar-scanner-5.0.1.3006-linux" ]; then
+                            curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+                            unzip -o -q sonar-scanner.zip
+                        fi
+                        
                         export PATH="$WORKSPACE/sonar-scanner-5.0.1.3006-linux/bin:$PATH"
 
                         echo "Running Embedded Native Scanner directly from the active code workspace..."
@@ -64,9 +67,6 @@ pipeline {
 
                         echo "Closing the secure tunnel safely..."
                         kill $PF_PID || true
-                        
-                        echo "Cleaning up Scanner zip..."
-                        rm -rf sonar-scanner.zip sonar-scanner-5.0.1.3006-linux
                     '''
                 }
             }
