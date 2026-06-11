@@ -8,7 +8,6 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
 
-        // SonarQube (Docker host)
         SONAR_URL       = "http://localhost:9001"
     }
 
@@ -20,14 +19,15 @@ pipeline {
             }
         }
 
-        stage('Trivy - Source Scan') {
+        stage('Trivy File System Scan') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     sh '''
                         trivy fs \
                           --exit-code 0 \
                           --severity HIGH,CRITICAL \
-                          --format table .
+                          --format table \
+                          .
                     '''
                 }
             }
@@ -35,36 +35,26 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-
-                    withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
-
-                        sh '''
-cat <<EOF > sonar-run.sh
-docker run --rm \
-  --network host \
-  -v $WORKSPACE:/usr/src \
-  sonarsource/sonar-scanner-cli:latest \
-  -Dsonar.host.url=http://localhost:9001 \
-  -Dsonar.token=$SONAR_TOKEN \
-  -Dsonar.projectKey=e-commerce \
-  -Dsonar.projectName=e-commerce \
-  -Dsonar.sources=. \
-  -Dsonar.scm.disabled=true \
-  -Dsonar.exclusions=**/node_modules/**,**/build/**,**/dist/**,**/target/**
-EOF
-
-chmod +x sonar-run.sh
-./sonar-run.sh
-                        '''
-                    }
+                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+                    sh '''
+                        docker run --rm \
+                          --network host \
+                          -v "$WORKSPACE:/usr/src" \
+                          sonarsource/sonar-scanner-cli:latest \
+                          -Dsonar.host.url=http://localhost:9001 \
+                          -Dsonar.token=$SONAR_TOKEN \
+                          -Dsonar.projectKey=e-commerce \
+                          -Dsonar.projectName=e-commerce \
+                          -Dsonar.sources=. \
+                          -Dsonar.scm.disabled=true \
+                          -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+                    '''
                 }
             }
         }
 
-        stage('Build Docker Images') {
+        stage('Build Images') {
             parallel {
-
                 stage('Cart') {
                     steps {
                         sh '''
@@ -72,49 +62,54 @@ chmod +x sonar-run.sh
                             chmod +x gradlew
                             ./gradlew bootJar -x test
                             cd ..
-                            docker build -t ${ECR_REGISTRY}/cart:${IMAGE_TAG} ./cart-cna-microservice
+                            docker build -t ${ECR_REGISTRY}/cart:${IMAGE_TAG} cart-cna-microservice
                         '''
                     }
                 }
 
                 stage('Products') {
                     steps {
-                        sh 'docker build -t ${ECR_REGISTRY}/products:${IMAGE_TAG} ./products-cna-microservice'
+                        sh '''
+                            docker build -t ${ECR_REGISTRY}/products:${IMAGE_TAG} products-cna-microservice
+                        '''
                     }
                 }
 
                 stage('Search') {
                     steps {
-                        sh 'docker build -t ${ECR_REGISTRY}/search:${IMAGE_TAG} ./search-cna-microservice'
+                        sh '''
+                            docker build -t ${ECR_REGISTRY}/search:${IMAGE_TAG} search-cna-microservice
+                        '''
                     }
                 }
 
                 stage('Users') {
                     steps {
-                        sh 'docker build -t ${ECR_REGISTRY}/users:${IMAGE_TAG} ./users-cna-microservice'
+                        sh '''
+                            docker build -t ${ECR_REGISTRY}/users:${IMAGE_TAG} users-cna-microservice
+                        '''
                     }
                 }
 
                 stage('Store UI') {
                     steps {
-                        sh 'docker build -t ${ECR_REGISTRY}/store-ui:${IMAGE_TAG} ./store-ui'
+                        sh '''
+                            docker build -t ${ECR_REGISTRY}/store-ui:${IMAGE_TAG} store-ui
+                        '''
                     }
                 }
             }
         }
 
-        stage('Trivy - Image Scan') {
+        stage('Trivy Image Scan') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     sh '''
-                        for img in cart products search users store-ui
-                        do
+                        for img in cart products search users store-ui; do
                           trivy image \
                             --exit-code 0 \
                             --severity HIGH,CRITICAL \
-                            --cache-dir /var/lib/trivy-cache \
-                            --scanners vuln \
-                            ${ECR_REGISTRY}/$img:${IMAGE_TAG}
+                            ${ECR_REGISTRY}/${img}:${IMAGE_TAG}
                         done
                     '''
                 }
@@ -125,10 +120,9 @@ chmod +x sonar-run.sh
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
                                   credentialsId: 'aws-credentials']]) {
-
                     sh '''
                         aws ecr get-login-password --region ${AWS_REGION} | \
-                        docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                          docker login --username AWS --password-stdin ${ECR_REGISTRY}
 
                         docker push ${ECR_REGISTRY}/cart:${IMAGE_TAG}
                         docker push ${ECR_REGISTRY}/products:${IMAGE_TAG}
@@ -144,7 +138,6 @@ chmod +x sonar-run.sh
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
                                   credentialsId: 'aws-credentials']]) {
-
                     sh '''
                         aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
 
@@ -197,11 +190,11 @@ chmod +x sonar-run.sh
 
     post {
         success {
-            echo "CI/CD Completed Successfully"
+            echo "CI/CD Pipeline Completed Successfully"
         }
 
         failure {
-            echo "CI/CD Failed - check logs"
+            echo "Pipeline Failed - check logs"
         }
     }
 }
