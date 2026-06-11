@@ -8,7 +8,7 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
         
-        // 🚀 استخدام الـ Cluster IP الداخلي المباشر لتخطي الـ Security Groups تماماً
+        // 🚀 الـ Cluster IP الداخلي المباشر والثابت للسونار
         SONAR_URL       = "http://172.20.178.247:9000"
     }
 
@@ -35,18 +35,15 @@ pipeline {
                 withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
                     withSonarQubeEnv('sonarqube') {
                         sh '''
-                            echo "Downloading Standalone SonarQube Scanner..."
+                            echo "Executing Host-Network Docker SonarQube Scan via Cluster IP..."
                             
-                            # 1. تحميل وفك ضغط الـ Scanner CLI الرسمي متفادياً إعدادات جينكينز الداخلية
-                            curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
-                            unzip -q -o sonar-scanner.zip
-                            
-                            echo "Starting Analysis via Internal Network..."
-                            
-                            # 2. تنفيذ الفحص مباشرة على ملفات الـ Workspace الحالية
-                            ./sonar-scanner-5.0.1.3006-linux/bin/sonar-scanner \
+                            # 🚀 استخدام --network host لدمج شبكة الحاوية مع السيرفر والوصول للمنافذ الداخلية مباشرة
+                            docker run --rm \
+                              --network host \
+                              -v "${WORKSPACE}":/usr/src \
+                              sonarsource/sonar-scanner-cli:latest \
                               -Dsonar.host.url="${SONAR_URL}" \
-                              -Dsonar.login="${SONAR_AUTH_TOKEN}" \
+                              -Dsonar.login="$SONAR_AUTH_TOKEN" \
                               -Dsonar.projectKey=e-commerce \
                               -Dsonar.projectName=e-commerce \
                               -Dsonar.sources=. \
@@ -54,9 +51,6 @@ pipeline {
                               -Dsonar.scm.disabled=true \
                               -Dsonar.qualitygate.wait=false \
                               -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
-                              
-                            # 3. تنظيف مخلفات الإسكانر
-                            rm -rf sonar-scanner.zip sonar-scanner-5.0.1.3006-linux
                         '''
                     }
                 }
