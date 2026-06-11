@@ -7,9 +7,6 @@ pipeline {
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
-        
-        // 🚀 استخدام الـ Cluster IP الداخلي والمستقر لتفادي الـ Firewalls والـ Load Balancer تماماً
-        SONAR_URL       = "http://172.20.178.247:9000"
     }
 
     stages {
@@ -35,17 +32,30 @@ pipeline {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
                         sh '''
-                            echo "Updating Kubeconfig Context..."
+                            echo "Updating Kubeconfig..."
                             aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
 
-                            echo "Executing Host-Network Docker SonarQube Scan via Internal Cluster IP..."
+                            echo "Fetching the exact active SonarQube Pod Name..."
+                            # جلب اسم الـ Pod المباشر الشغال حالياً
+                            SONAR_POD=$(kubectl get pods -n sonarqube -l app.kubernetes.io/name=sonarqube -o jsonpath='{.items[0].metadata.name}')
+                            echo "Targeting Pod: $SONAR_POD"
+
+                            echo "Opening a secure direct background tunnel to the Pod..."
+                            # فتح نفق على بورت 9001 على السيرفر المحلي محمي وخلفي
+                            kubectl port-forward pod/$SONAR_POD 9001:9000 -n sonarqube > pf.log 2>&1 &
+                            PF_PID=$!
+
+                            # انتشاره 7 ثوانٍ لضمان استقرار النفق
+                            sleep 7
+
+                            echo "Running the scanner directly using our secure tunnel connection..."
                             
-                            # تشغيل الحاوية المدمجة محلياً وربطها بالشبكة الداخلية مباشرة
+                            # تشغيل الـ Scanner الداخلي باستخدام الـ Host Network لضرب الـ Localhost 9001 المفتوح
                             docker run --rm \
                               --network host \
                               -v "${WORKSPACE}":/usr/src \
                               sonarsource/sonar-scanner-cli:latest \
-                              -Dsonar.host.url="${SONAR_URL}" \
+                              -Dsonar.host.url="http://127.0.0.1:9001" \
                               -Dsonar.login="$SONAR_AUTH_TOKEN" \
                               -Dsonar.projectKey=e-commerce \
                               -Dsonar.projectName=e-commerce \
@@ -54,6 +64,9 @@ pipeline {
                               -Dsonar.scm.disabled=true \
                               -Dsonar.qualitygate.wait=false \
                               -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+
+                            echo "Closing the secure tunnel safely..."
+                            kill $PF_PID || true
                         '''
                     }
                 }
