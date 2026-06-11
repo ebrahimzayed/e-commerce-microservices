@@ -111,12 +111,13 @@ EOF
             }
         }
 
+        // 🔥 التعديل هنا: تم إضافة --timeout 15m لمنع الـ Trivy من الفشل والتعليق زمنياً
         stage('Trivy Image Scan') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     sh '''
                         for img in cart products search users store-ui; do
-                          trivy image --exit-code 0 --severity HIGH,CRITICAL \
+                          trivy image --timeout 15m --exit-code 0 --severity HIGH,CRITICAL \
                           ${ECR_REGISTRY}/$img:${IMAGE_TAG}
                         done
                     '''
@@ -182,7 +183,7 @@ EOF
                       -v /etc:/etc:ro \
                       -v /var:/var:ro \
                       -v ~/.kube:/root/.kube:ro \
-                      aquasec/kube-bench:latest run --exit-code 0
+                      -v  aquasec/kube-bench:latest run --exit-code 0
                 '''
             }
         }
