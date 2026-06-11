@@ -39,19 +39,15 @@ pipeline {
                         SONAR_POD=$(kubectl get pods -n sonarqube -o jsonpath='{.items[0].metadata.name}')
                         echo "Targeting Pod: $SONAR_POD"
 
-                        echo "Opening a secure direct background tunnel listening on all interfaces..."
+                        echo "Opening a secure direct background tunnel..."
                         kubectl port-forward pod/$SONAR_POD 9001:9000 -n sonarqube --address 0.0.0.0 > pf.log 2>&1 &
                         PF_PID=$!
 
-                        # انتظار استقرار النفق الخلفي
+                        # انتظار استقرار النفق
                         sleep 10
 
-                        echo "Running fully mapped source scanner..."
-                        docker run --rm \
-                          --network host \
-                          -v "${WORKSPACE}":/usr/src \
-                          -w /usr/src \
-                          sonarsource/sonar-scanner-cli:latest \
+                        echo "Running Native Scanner directly from Workspace..."
+                        sonar-scanner \
                           -Dsonar.host.url="http://127.0.0.1:9001" \
                           -Dsonar.login="${SONAR_STATIC_TOKEN}" \
                           -Dsonar.projectKey=e-commerce \
@@ -59,6 +55,7 @@ pipeline {
                           -Dsonar.scm.disabled=true \
                           -Dsonar.qualitygate.wait=false \
                           -Dsonar.sources=. \
+                          -Dsonar.java.binaries=. \
                           -Dsonar.exclusions="**/node_modules/**,**/.gradle/**,**/gradle/**,**/.next/**,**/*.jar,**/*.bin,**/build/**,**/target/**"
                         
                         echo "Closing the secure tunnel safely..."
@@ -68,7 +65,6 @@ pipeline {
             }
         }
 
-        // بناء متتالي (Sequential) متزن لحماية ذاكرة الكلاستر من الـ Timeout والاختناق
         stage('Build Microservices Images') {
             steps {
                 echo "Building 1/5: Cart Service..."
