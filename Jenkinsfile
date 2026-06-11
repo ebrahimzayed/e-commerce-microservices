@@ -8,8 +8,8 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
 
-        // SonarQube (IMPORTANT: use container/service name not localhost)
-        SONAR_URL       = "http://sonarqube:9000"
+        // IMPORTANT: SonarQube runs on host port 9001
+        SONAR_URL       = "http://host.docker.internal:9001"
     }
 
     stages {
@@ -50,8 +50,7 @@ EOF
 docker build -t local-sonar-scanner -f SonarDockerfile .
 
 docker run --rm --network host \
-  -e SONAR_HOST_URL="${SONAR_URL}" \
-  -e SONAR_TOKEN="${SONAR_AUTH_TOKEN}" \
+  -v /var/jenkins_home/workspace:/usr/src \
   local-sonar-scanner \
   -Dsonar.host.url=${SONAR_URL} \
   -Dsonar.login=${SONAR_AUTH_TOKEN} \
@@ -115,7 +114,6 @@ rm -f SonarDockerfile
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     sh '''
                         trivy image --exit-code 0 --severity HIGH,CRITICAL \
-                          --format table \
                           ${ECR_REGISTRY}/cart:${IMAGE_TAG}
 
                         trivy image --exit-code 0 --severity HIGH,CRITICAL \
@@ -204,11 +202,11 @@ rm -f SonarDockerfile
 
     post {
         success {
-            echo 'Pipeline succeeded'
+            echo 'CI/CD Pipeline Succeeded'
         }
 
         failure {
-            echo 'Pipeline failed'
+            echo 'CI/CD Pipeline Failed'
         }
     }
 }
