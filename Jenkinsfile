@@ -8,6 +8,7 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
 
+        // التوجيه المستقر للبورت المحلي للحاوية
         SONAR_URL       = "http://localhost:9001"
     }
 
@@ -31,23 +32,26 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
-                    sh '''
-                        echo "Starting SonarQube Scan..."
+                /* استخدام الـ ID المضمون والمتطابق مع الـ Jenkins */
+                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
+                    withSonarQubeEnv('sonarqube') {
+                        sh '''
+                            echo "Starting SonarQube Scan..."
 
-                        docker run --rm \
-                          --network host \
-                          -v "$WORKSPACE:/usr/src" \
-                          -w /usr/src \
-                          sonarsource/sonar-scanner-cli:latest \
-                          -Dsonar.host.url=http://localhost:9001 \
-                          -Dsonar.token="$SONAR_TOKEN" \
-                          -Dsonar.projectKey=e-commerce \
-                          -Dsonar.projectName=e-commerce \
-                          -Dsonar.sources=. \
-                          -Dsonar.scm.disabled=true \
-                          -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
-                    '''
+                            docker run --rm \
+                              --network host \
+                              -v "$WORKSPACE:/usr/src" \
+                              -w /usr/src \
+                              sonarsource/sonar-scanner-cli:latest \
+                              -Dsonar.host.url="${SONAR_URL}" \
+                              -Dsonar.login="$SONAR_AUTH_TOKEN" \
+                              -Dsonar.projectKey=e-commerce \
+                              -Dsonar.projectName=e-commerce \
+                              -Dsonar.sources=. \
+                              -Dsonar.scm.disabled=true \
+                              -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+                        '''
+                    }
                 }
             }
         }
@@ -143,20 +147,12 @@ pipeline {
                         kubectl apply -f infra/k8s/apps/base/users/ -n e-commerce || true
                         kubectl apply -f infra/k8s/apps/base/store-ui/ -n e-commerce || true
 
-                        kubectl set image deployment/cart-deployment \
-                          cart=${ECR_REGISTRY}/cart:${IMAGE_TAG} -n e-commerce
-
-                        kubectl set image deployment/products-deployment \
-                          products=${ECR_REGISTRY}/products:${IMAGE_TAG} -n e-commerce
-
-                        kubectl set image deployment/search-deployment \
-                          search=${ECR_REGISTRY}/search:${IMAGE_TAG} -n e-commerce
-
-                        kubectl set image deployment/users-deployment \
-                          users=${ECR_REGISTRY}/users:${IMAGE_TAG} -n e-commerce
-
-                        kubectl set image deployment/store-ui-deployment \
-                          store-ui=${ECR_REGISTRY}/store-ui:${IMAGE_TAG} -n e-commerce
+                        # تنظيف وتحديث مستمر لملفات الأبليكيشن بدون تضارب في الـ Services
+                        kubectl set image deployment/cart-deployment cart=${ECR_REGISTRY}/cart:${IMAGE_TAG} -n e-commerce
+                        kubectl set image deployment/products-deployment products=${ECR_REGISTRY}/products:${IMAGE_TAG} -n e-commerce
+                        kubectl set image deployment/search-deployment search=${ECR_REGISTRY}/search:${IMAGE_TAG} -n e-commerce
+                        kubectl set image deployment/users-deployment users=${ECR_REGISTRY}/users:${IMAGE_TAG} -n e-commerce
+                        kubectl set image deployment/store-ui-deployment store-ui=${ECR_REGISTRY}/store-ui:${IMAGE_TAG} -n e-commerce
 
                         kubectl rollout status deployment -n e-commerce --timeout=300s
                     '''
@@ -180,10 +176,10 @@ pipeline {
 
     post {
         success {
-            echo "CI/CD Pipeline SUCCESS"
+            echo "CI/CD Pipeline SUCCESS ✅"
         }
         failure {
-            echo "CI/CD Pipeline FAILED"
+            echo "CI/CD Pipeline FAILED ❌"
         }
     }
 }
