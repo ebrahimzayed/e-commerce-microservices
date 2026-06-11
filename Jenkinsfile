@@ -8,8 +8,8 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
         
-        // استخدام الـ Service Name الداخلي المباشر والمستقر تماماً
-        SONAR_URL       = "http://sonarqube-sonarqube.sonarqube.svc.cluster.local:9000"
+        // 🚀 استخدام الـ Cluster IP الداخلي المباشر لتخطي الـ Security Groups تماماً
+        SONAR_URL       = "http://172.20.178.247:9000"
     }
 
     stages {
@@ -32,27 +32,32 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                // استخدام الـ Credentials المعتمدة للسونار بأمان ونظافة
                 withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
-                    // تعريف بيئة السونار الرسمية المدمجة داخل جينكينز
                     withSonarQubeEnv('sonarqube') {
-                        script {
-                            // 🚀 الحل السحري: استدعاء أداة الاسكانر المحلية لجينكينز لفحص المجلد الحالي مباشرة
-                            def scannerHome = tool 'sonarqube'
-                            sh """
-                                echo "Starting Native SonarQube Scan on Workspace..."
-                                ${scannerHome}/bin/sonar-scanner \
-                                  -Dsonar.host.url="${SONAR_URL}" \
-                                  -Dsonar.login="${SONAR_AUTH_TOKEN}" \
-                                  -Dsonar.projectKey=e-commerce \
-                                  -Dsonar.projectName=e-commerce \
-                                  -Dsonar.sources=. \
-                                  -Dsonar.java.binaries=. \
-                                  -Dsonar.scm.disabled=true \
-                                  -Dsonar.qualitygate.wait=false \
-                                  -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
-                            """
-                        }
+                        sh '''
+                            echo "Downloading Standalone SonarQube Scanner..."
+                            
+                            # 1. تحميل وفك ضغط الـ Scanner CLI الرسمي متفادياً إعدادات جينكينز الداخلية
+                            curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+                            unzip -q -o sonar-scanner.zip
+                            
+                            echo "Starting Analysis via Internal Network..."
+                            
+                            # 2. تنفيذ الفحص مباشرة على ملفات الـ Workspace الحالية
+                            ./sonar-scanner-5.0.1.3006-linux/bin/sonar-scanner \
+                              -Dsonar.host.url="${SONAR_URL}" \
+                              -Dsonar.login="${SONAR_AUTH_TOKEN}" \
+                              -Dsonar.projectKey=e-commerce \
+                              -Dsonar.projectName=e-commerce \
+                              -Dsonar.sources=. \
+                              -Dsonar.java.binaries=. \
+                              -Dsonar.scm.disabled=true \
+                              -Dsonar.qualitygate.wait=false \
+                              -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+                              
+                            # 3. تنظيف مخلفات الإسكانر
+                            rm -rf sonar-scanner.zip sonar-scanner-5.0.1.3006-linux
+                        '''
                     }
                 }
             }
