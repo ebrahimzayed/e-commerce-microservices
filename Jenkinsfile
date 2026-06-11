@@ -35,17 +35,17 @@ pipeline {
                         sh '''
                             aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
 
-                            echo "Starting kubectl port-forward for SonarQube..."
-                            kubectl port-forward svc/sonarqube 9000:9000 -n monitoring &
-                            PF_PID=$!
-                            sleep 8
+                            echo "Getting SonarQube LoadBalancer URL..."
+                            SONAR_LB=$(kubectl get svc sonarqube-sonarqube -n sonarqube \
+                                       -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+                            echo "SonarQube URL: http://${SONAR_LB}:9000"
 
-                            echo "Running SonarQube scan via localhost..."
+                            echo "Running SonarQube scan..."
                             docker run --rm \
                               --network host \
                               -v "${WORKSPACE}":/usr/src \
                               sonarsource/sonar-scanner-cli:latest \
-                              -Dsonar.host.url="http://localhost:9000" \
+                              -Dsonar.host.url="http://${SONAR_LB}:9000" \
                               -Dsonar.login="$SONAR_AUTH_TOKEN" \
                               -Dsonar.projectKey=e-commerce \
                               -Dsonar.projectName=e-commerce \
@@ -54,9 +54,6 @@ pipeline {
                               -Dsonar.scm.disabled=true \
                               -Dsonar.qualitygate.wait=false \
                               -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
-
-                            echo "Stopping port-forward..."
-                            kill $PF_PID || true
                         '''
                     }
                 }
