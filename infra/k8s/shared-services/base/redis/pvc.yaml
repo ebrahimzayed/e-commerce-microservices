@@ -9,4 +9,4 @@ spec:
   storageClassName: gp2-csi
   resources:
     requests:
-      storage: 2Gi
+      storage: 1Gi
