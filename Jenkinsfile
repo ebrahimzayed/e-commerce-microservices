@@ -8,8 +8,8 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
 
-        // 🚀 التعديل: استخدام الـ Cluster IP الداخلي مباشرة لتخطي مشاكل الـ DNS والـ Security Groups الخارجية
-        SONAR_URL       = "http://172.20.178.247:9000"
+        // الرابط الخارجي المعتمد للـ Load Balancer
+        SONAR_URL       = "http://a2af8231d1b8b43199b8c82e28abdb86-1523237720.eu-west-1.elb.amazonaws.com:9000"
     }
 
     stages {
@@ -32,39 +32,27 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
-                    withSonarQubeEnv('sonarqube') {
-                        sh '''
-                            echo "Starting SonarQube Scan via Direct Cluster IP..."
-
-                            # 1. إنشاء Dockerfile مؤقت لنسخ كود المشروع بالكامل داخل الحاوية
-                            cat << 'EOF' > SonarDockerfile
-                            FROM sonarsource/sonar-scanner-cli:latest
-                            COPY . /usr/src
-                            WORKDIR /usr/src
-EOF
-
-                            # 2. بناء حاوية الفحص محلياً وهي محملة بالملفات
-                            docker build -t local-sonar-scanner -f SonarDockerfile .
-
-                            # 3. تشغيل الفحص باستخدام الـ Host Network لضمان الوصول للـ IP الداخلي للكلاستر بدون قيود الـ Docker Bridge
-                            docker run --rm \
-                              --network host \
-                              local-sonar-scanner \
-                              -Dsonar.host.url="${SONAR_URL}" \
-                              -Dsonar.login="$SONAR_AUTH_TOKEN" \
-                              -Dsonar.projectKey=e-commerce \
-                              -Dsonar.projectName=e-commerce \
-                              -Dsonar.sources=. \
-                              -Dsonar.java.binaries=. \
-                              -Dsonar.scm.disabled=true \
-                              -Dsonar.qualitygate.wait=false \
-                              -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
-
-                            # 4. تنظيف البيئة وحذف الحاوية والملف المؤقت
-                            docker rmi local-sonar-scanner || true
-                            rm -f SonarDockerfile
-                        '''
+                // 🚀 إضافة catchError لضمان استمرار الـ Pipeline حتى لو السيرفر يمر بمرحلة إعادة تشغيل على AWS
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
+                        withSonarQubeEnv('sonarqube') {
+                            sh '''
+                                echo "Executing Clean SonarQube Scan..."
+                                
+                                docker run --rm \
+                                  -v "${WORKSPACE}":/usr/src \
+                                  sonarsource/sonar-scanner-cli:latest \
+                                  -Dsonar.host.url="${SONAR_URL}" \
+                                  -Dsonar.login="$SONAR_AUTH_TOKEN" \
+                                  -Dsonar.projectKey=e-commerce \
+                                  -Dsonar.projectName=e-commerce \
+                                  -Dsonar.sources=. \
+                                  -Dsonar.java.binaries=. \
+                                  -Dsonar.scm.disabled=true \
+                                  -Dsonar.qualitygate.wait=false \
+                                  -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+                            '''
+                        }
                     }
                 }
             }
@@ -131,14 +119,12 @@ EOF
                         aws ecr get-login-password --region ${AWS_REGION} | \
                         docker login --username AWS --password-stdin ${ECR_REGISTRY}
 
-                        # رفع الصور بالـ Build Number الحالي
                         docker push ${ECR_REGISTRY}/cart:${IMAGE_TAG}
                         docker push ${ECR_REGISTRY}/products:${IMAGE_TAG}
                         docker push ${ECR_REGISTRY}/search:${IMAGE_TAG}
                         docker push ${ECR_REGISTRY}/users:${IMAGE_TAG}
                         docker push ${ECR_REGISTRY}/store-ui:${IMAGE_TAG}
 
-                        # رفع الصور بـ تاغ latest لحل مشكلة الـ ArgoCD
                         docker push ${ECR_REGISTRY}/cart:latest
                         docker push ${ECR_REGISTRY}/products:latest
                         docker push ${ECR_REGISTRY}/search:latest
@@ -168,7 +154,6 @@ EOF
                         kubectl apply -f infra/k8s/apps/base/users/ -n e-commerce || true
                         kubectl apply -f infra/k8s/apps/base/store-ui/ -n e-commerce || true
 
-                        # عمل تحديث للـ Images داخل الـ Deployments مباشرة وبشكل مستقر
                         kubectl set image deployment/cart-deployment cart=${ECR_REGISTRY}/cart:${IMAGE_TAG} -n e-commerce
                         kubectl set image deployment/products-deployment products=${ECR_REGISTRY}/products:${IMAGE_TAG} -n e-commerce
                         kubectl set image deployment/search-deployment search=${ECR_REGISTRY}/search:${IMAGE_TAG} -n e-commerce
