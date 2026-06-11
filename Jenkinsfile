@@ -7,7 +7,9 @@ pipeline {
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
-        SONAR_URL       = "http://localhost:9001"
+
+        // SonarQube (IMPORTANT: use container/service name not localhost)
+        SONAR_URL       = "http://sonarqube:9000"
     }
 
     stages {
@@ -18,11 +20,15 @@ pipeline {
             }
         }
 
-        stage('Trivy FS Scan') {
+        stage('Trivy File System Scan') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     sh '''
-                        trivy fs . --exit-code 0 --severity HIGH,CRITICAL --format table
+                        trivy fs \
+                          --exit-code 0 \
+                          --severity HIGH,CRITICAL \
+                          --format table \
+                          .
                     '''
                 }
             }
@@ -31,16 +37,32 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+
                     withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_AUTH_TOKEN')]) {
+
                         sh '''
-                            docker run --rm --network host \
-                              -v "$PWD:/usr/src" \
-                              sonarsource/sonar-scanner-cli:latest \
-                              -Dsonar.host.url=${SONAR_URL} \
-                              -Dsonar.token=${SONAR_AUTH_TOKEN} \
-                              -Dsonar.projectKey=e-commerce \
-                              -Dsonar.projectName=e-commerce \
-                              -Dsonar.sources=.
+cat << 'EOF' > SonarDockerfile
+FROM sonarsource/sonar-scanner-cli:latest
+COPY . /usr/src
+WORKDIR /usr/src
+EOF
+
+docker build -t local-sonar-scanner -f SonarDockerfile .
+
+docker run --rm --network host \
+  -e SONAR_HOST_URL="${SONAR_URL}" \
+  -e SONAR_TOKEN="${SONAR_AUTH_TOKEN}" \
+  local-sonar-scanner \
+  -Dsonar.host.url=${SONAR_URL} \
+  -Dsonar.login=${SONAR_AUTH_TOKEN} \
+  -Dsonar.projectKey=e-commerce \
+  -Dsonar.projectName=e-commerce \
+  -Dsonar.sources=. \
+  -Dsonar.scm.disabled=true \
+  -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+
+docker rmi local-sonar-scanner || true
+rm -f SonarDockerfile
                         '''
                     }
                 }
@@ -50,43 +72,39 @@ pipeline {
         stage('Build Images') {
             parallel {
 
-                stage('Cart') {
+                stage('Build Cart') {
                     steps {
                         sh '''
+                            cd ./cart-cna-microservice
+                            chmod +x gradlew
+                            ./gradlew bootJar -x test
+                            cd ..
                             docker build -t ${ECR_REGISTRY}/cart:${IMAGE_TAG} ./cart-cna-microservice
                         '''
                     }
                 }
 
-                stage('Products') {
+                stage('Build Products') {
                     steps {
-                        sh '''
-                            docker build -t ${ECR_REGISTRY}/products:${IMAGE_TAG} ./products-cna-microservice
-                        '''
+                        sh 'docker build -t ${ECR_REGISTRY}/products:${IMAGE_TAG} ./products-cna-microservice'
                     }
                 }
 
-                stage('Search') {
+                stage('Build Search') {
                     steps {
-                        sh '''
-                            docker build -t ${ECR_REGISTRY}/search:${IMAGE_TAG} ./search-cna-microservice
-                        '''
+                        sh 'docker build -t ${ECR_REGISTRY}/search:${IMAGE_TAG} ./search-cna-microservice'
                     }
                 }
 
-                stage('Users') {
+                stage('Build Users') {
                     steps {
-                        sh '''
-                            docker build -t ${ECR_REGISTRY}/users:${IMAGE_TAG} ./users-cna-microservice
-                        '''
+                        sh 'docker build -t ${ECR_REGISTRY}/users:${IMAGE_TAG} ./users-cna-microservice'
                     }
                 }
 
-                stage('Store UI') {
+                stage('Build Store UI') {
                     steps {
-                        sh '''
-                            docker build -t ${ECR_REGISTRY}/store-ui:${IMAGE_TAG} ./store-ui
-                        '''
+                        sh 'docker build -t ${ECR_REGISTRY}/store-ui:${IMAGE_TAG} ./store-ui'
                     }
                 }
             }
@@ -96,11 +114,21 @@ pipeline {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     sh '''
-                        trivy image ${ECR_REGISTRY}/cart:${IMAGE_TAG} --exit-code 0 --severity HIGH,CRITICAL
-                        trivy image ${ECR_REGISTRY}/products:${IMAGE_TAG} --exit-code 0 --severity HIGH,CRITICAL
-                        trivy image ${ECR_REGISTRY}/search:${IMAGE_TAG} --exit-code 0 --severity HIGH,CRITICAL
-                        trivy image ${ECR_REGISTRY}/users:${IMAGE_TAG} --exit-code 0 --severity HIGH,CRITICAL
-                        trivy image ${ECR_REGISTRY}/store-ui:${IMAGE_TAG} --exit-code 0 --severity HIGH,CRITICAL
+                        trivy image --exit-code 0 --severity HIGH,CRITICAL \
+                          --format table \
+                          ${ECR_REGISTRY}/cart:${IMAGE_TAG}
+
+                        trivy image --exit-code 0 --severity HIGH,CRITICAL \
+                          ${ECR_REGISTRY}/products:${IMAGE_TAG}
+
+                        trivy image --exit-code 0 --severity HIGH,CRITICAL \
+                          ${ECR_REGISTRY}/search:${IMAGE_TAG}
+
+                        trivy image --exit-code 0 --severity HIGH,CRITICAL \
+                          ${ECR_REGISTRY}/users:${IMAGE_TAG}
+
+                        trivy image --exit-code 0 --severity HIGH,CRITICAL \
+                          ${ECR_REGISTRY}/store-ui:${IMAGE_TAG}
                     '''
                 }
             }
@@ -112,7 +140,7 @@ pipeline {
                                   credentialsId: 'aws-credentials']]) {
                     sh '''
                         aws ecr get-login-password --region ${AWS_REGION} | \
-                        docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                            docker login --username AWS --password-stdin ${ECR_REGISTRY}
 
                         docker push ${ECR_REGISTRY}/cart:${IMAGE_TAG}
                         docker push ${ECR_REGISTRY}/products:${IMAGE_TAG}
@@ -131,26 +159,29 @@ pipeline {
                     sh '''
                         aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
 
-                        kubectl get namespace e-commerce || kubectl create namespace e-commerce
-                        kubectl get namespace shared-services || kubectl create namespace shared-services
+                        kubectl apply -f infra/k8s/shared-services/base/redis/ -n shared-services || true
+                        kubectl apply -f infra/k8s/shared-services/base/mongodb/ -n shared-services || true
 
-                        # Shared Services (Kustomize FIXED)
-                        kubectl apply -k infra/k8s/shared-services/base/redis -n shared-services
-                        kubectl apply -k infra/k8s/shared-services/base/mongodb -n shared-services
+                        kubectl apply -f infra/k8s/apps/base/cart/ -n e-commerce || true
+                        kubectl apply -f infra/k8s/apps/base/products/ -n e-commerce || true
+                        kubectl apply -f infra/k8s/apps/base/search/ -n e-commerce || true
+                        kubectl apply -f infra/k8s/apps/base/users/ -n e-commerce || true
+                        kubectl apply -f infra/k8s/apps/base/store-ui/ -n e-commerce || true
 
-                        # Apps (Kustomize FIXED)
-                        kubectl apply -k infra/k8s/apps/base/cart -n e-commerce
-                        kubectl apply -k infra/k8s/apps/base/products -n e-commerce
-                        kubectl apply -k infra/k8s/apps/base/search -n e-commerce
-                        kubectl apply -k infra/k8s/apps/base/users -n e-commerce
-                        kubectl apply -k infra/k8s/apps/base/store-ui -n e-commerce
+                        kubectl set image deployment/cart-deployment \
+                          cart=${ECR_REGISTRY}/cart:${IMAGE_TAG} -n e-commerce
 
-                        # Update images (safe & correct)
-                        kubectl set image deployment/cart-deployment cart=${ECR_REGISTRY}/cart:${IMAGE_TAG} -n e-commerce
-                        kubectl set image deployment/products-deployment products=${ECR_REGISTRY}/products:${IMAGE_TAG} -n e-commerce
-                        kubectl set image deployment/search-deployment search=${ECR_REGISTRY}/search:${IMAGE_TAG} -n e-commerce
-                        kubectl set image deployment/users-deployment users=${ECR_REGISTRY}/users:${IMAGE_TAG} -n e-commerce
-                        kubectl set image deployment/store-ui-deployment store-ui=${ECR_REGISTRY}/store-ui:${IMAGE_TAG} -n e-commerce
+                        kubectl set image deployment/products-deployment \
+                          products=${ECR_REGISTRY}/products:${IMAGE_TAG} -n e-commerce
+
+                        kubectl set image deployment/search-deployment \
+                          search=${ECR_REGISTRY}/search:${IMAGE_TAG} -n e-commerce
+
+                        kubectl set image deployment/users-deployment \
+                          users=${ECR_REGISTRY}/users:${IMAGE_TAG} -n e-commerce
+
+                        kubectl set image deployment/store-ui-deployment \
+                          store-ui=${ECR_REGISTRY}/store-ui:${IMAGE_TAG} -n e-commerce
 
                         kubectl rollout status deployment -n e-commerce --timeout=300s
                     '''
@@ -158,7 +189,7 @@ pipeline {
             }
         }
 
-        stage('KubeBench') {
+        stage('KubeBench Scan') {
             steps {
                 sh '''
                     docker run --rm \
@@ -173,11 +204,11 @@ pipeline {
 
     post {
         success {
-            echo "CI/CD Pipeline SUCCESS 🚀"
+            echo 'Pipeline succeeded'
         }
 
         failure {
-            echo "CI/CD Pipeline FAILED ❌"
+            echo 'Pipeline failed'
         }
     }
 }
