@@ -7,9 +7,6 @@ pipeline {
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
-        
-        // 🚀 الـ Cluster IP الداخلي المباشر والثابت للسونار
-        SONAR_URL       = "http://172.20.178.247:9000"
     }
 
     stages {
@@ -32,17 +29,23 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
-                    withSonarQubeEnv('sonarqube') {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
+                                  credentialsId: 'aws-credentials']]) {
+                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
                         sh '''
-                            echo "Executing Host-Network Docker SonarQube Scan via Cluster IP..."
-                            
-                            # 🚀 استخدام --network host لدمج شبكة الحاوية مع السيرفر والوصول للمنافذ الداخلية مباشرة
+                            aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
+
+                            echo "Starting kubectl port-forward for SonarQube..."
+                            kubectl port-forward svc/sonarqube 9000:9000 -n monitoring &
+                            PF_PID=$!
+                            sleep 8
+
+                            echo "Running SonarQube scan via localhost..."
                             docker run --rm \
                               --network host \
                               -v "${WORKSPACE}":/usr/src \
                               sonarsource/sonar-scanner-cli:latest \
-                              -Dsonar.host.url="${SONAR_URL}" \
+                              -Dsonar.host.url="http://localhost:9000" \
                               -Dsonar.login="$SONAR_AUTH_TOKEN" \
                               -Dsonar.projectKey=e-commerce \
                               -Dsonar.projectName=e-commerce \
@@ -51,6 +54,9 @@ pipeline {
                               -Dsonar.scm.disabled=true \
                               -Dsonar.qualitygate.wait=false \
                               -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+
+                            echo "Stopping port-forward..."
+                            kill $PF_PID || true
                         '''
                     }
                 }
