@@ -80,32 +80,32 @@ EOF
                             chmod +x gradlew
                             ./gradlew bootJar -x test
                             cd ..
-                            docker build -t ${ECR_REGISTRY}/cart:${IMAGE_TAG} cart-cna-microservice
+                            docker build -t ${ECR_REGISTRY}/cart:${IMAGE_TAG} -t ${ECR_REGISTRY}/cart:latest cart-cna-microservice
                         '''
                     }
                 }
 
                 stage('Products') {
                     steps {
-                        sh 'docker build -t ${ECR_REGISTRY}/products:${IMAGE_TAG} products-cna-microservice'
+                        sh 'docker build -t ${ECR_REGISTRY}/products:${IMAGE_TAG} -t ${ECR_REGISTRY}/products:latest products-cna-microservice'
                     }
                 }
 
                 stage('Search') {
                     steps {
-                        sh 'docker build -t ${ECR_REGISTRY}/search:${IMAGE_TAG} search-cna-microservice'
+                        sh 'docker build -t ${ECR_REGISTRY}/search:${IMAGE_TAG} -t ${ECR_REGISTRY}/search:latest search-cna-microservice'
                     }
                 }
 
                 stage('Users') {
                     steps {
-                        sh 'docker build -t ${ECR_REGISTRY}/users:${IMAGE_TAG} users-cna-microservice'
+                        sh 'docker build -t ${ECR_REGISTRY}/users:${IMAGE_TAG} -t ${ECR_REGISTRY}/users:latest users-cna-microservice'
                     }
                 }
 
                 stage('Store UI') {
                     steps {
-                        sh 'docker build -t ${ECR_REGISTRY}/store-ui:${IMAGE_TAG} store-ui'
+                        sh 'docker build -t ${ECR_REGISTRY}/store-ui:${IMAGE_TAG} -t ${ECR_REGISTRY}/store-ui:latest store-ui'
                     }
                 }
             }
@@ -132,11 +132,19 @@ EOF
                         aws ecr get-login-password --region ${AWS_REGION} | \
                         docker login --username AWS --password-stdin ${ECR_REGISTRY}
 
+                        # رفع الصور بالـ Build Number الحالي
                         docker push ${ECR_REGISTRY}/cart:${IMAGE_TAG}
                         docker push ${ECR_REGISTRY}/products:${IMAGE_TAG}
                         docker push ${ECR_REGISTRY}/search:${IMAGE_TAG}
                         docker push ${ECR_REGISTRY}/users:${IMAGE_TAG}
                         docker push ${ECR_REGISTRY}/store-ui:${IMAGE_TAG}
+
+                        # رفع الصور بـ تاغ latest لحل مشكلة الـ ArgoCD
+                        docker push ${ECR_REGISTRY}/cart:latest
+                        docker push ${ECR_REGISTRY}/products:latest
+                        docker push ${ECR_REGISTRY}/search:latest
+                        docker push ${ECR_REGISTRY}/users:latest
+                        docker push ${ECR_REGISTRY}/store-ui:latest
                     '''
                 }
             }
@@ -174,7 +182,6 @@ EOF
             }
         }
 
-        // 🔥 تم تصحيح الـ Typo هنا والـ Volumes بقت سليمة تماماً لتشغيل أداة الفحص بنجاح
         stage('KubeBench') {
             steps {
                 sh '''
