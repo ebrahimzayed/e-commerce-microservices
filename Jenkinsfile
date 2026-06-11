@@ -45,36 +45,33 @@ pipeline {
 
                         # انتظار استقرار النفق الخلفي
                         sleep 10
-                    '''
-                }
-                
-                // استخدام الـ Plugin المدمج جوه جينكينز للتعامل مع الحاوية بأمان وقراءة الملفات الحقيقية
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    sh '''
-                        echo "Executing Embedded Scanner via Docker with explicit Host Workdir mapping..."
-                        docker run --rm \
-                          --network host \
-                          --volumes-from $(hostname) \
-                          -w "${WORKSPACE}" \
-                          sonarsource/sonar-scanner-cli:latest \
+
+                        echo "Downloading Portable Sonar Scanner CLI directly into Workspace..."
+                        curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+                        unzip -q sonar-scanner.zip
+                        export PATH="$WORKSPACE/sonar-scanner-5.0.1.3006-linux/bin:$PATH"
+
+                        echo "Running Embedded Native Scanner directly from the active code workspace..."
+                        sonar-scanner \
                           -Dsonar.host.url="http://127.0.0.1:9001" \
                           -Dsonar.login="${SONAR_STATIC_TOKEN}" \
                           -Dsonar.projectKey=e-commerce \
                           -Dsonar.projectName=e-commerce \
                           -Dsonar.scm.disabled=true \
                           -Dsonar.qualitygate.wait=false \
-                          -Dsonar.sources=.
+                          -Dsonar.sources=. \
+                          -Dsonar.exclusions="**/node_modules/**,**/.gradle/**,**/gradle/**,**/.next/**,**/*.jar,**/*.bin,**/build/**,**/target/**"
+
+                        echo "Closing the secure tunnel safely..."
+                        kill $PF_PID || true
+                        
+                        echo "Cleaning up Scanner zip..."
+                        rm -rf sonar-scanner.zip sonar-scanner-5.0.1.3006-linux
                     '''
                 }
-
-                sh '''
-                    echo "Closing the secure tunnel safely..."
-                    kill $(pgrep -f "port-forward") || true
-                '''
             }
         }
 
-        // بناء متتالي (Sequential) متزن لحماية ذاكرة الكلاستر من الـ Timeout والاختناق
         stage('Build Microservices Images') {
             steps {
                 echo "Building 1/5: Cart Service..."
