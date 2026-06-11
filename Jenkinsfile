@@ -8,8 +8,8 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
 
-        // 🚀 الرابط الداخلي المستقر للـ SonarQube المعتمد على الـ Cluster Service مباشرة
-        SONAR_URL       = "http://sonarqube-sonarqube.sonarqube.svc.cluster.local:9000"
+        // 🚀 التعديل النهائي: استخدام رابط الـ AWS Load Balancer العام للوصول من خارج الكلاستر
+        SONAR_URL       = "http://a2af8231d1b8b43199b8c82e28abdb86-1523237720.eu-west-1.elb.amazonaws.com:9000"
     }
 
     stages {
@@ -35,7 +35,7 @@ pipeline {
                 withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
                     withSonarQubeEnv('sonarqube') {
                         sh '''
-                            echo "Starting SonarQube Scan..."
+                            echo "Starting SonarQube Scan via AWS Load Balancer..."
 
                             # 1. إنشاء Dockerfile مؤقت لنسخ كود المشروع بالكامل داخل الحاوية
                             cat << 'EOF' > SonarDockerfile
@@ -47,7 +47,7 @@ EOF
                             # 2. بناء حاوية الفحص محلياً وهي محملة بالملفات
                             docker build -t local-sonar-scanner -f SonarDockerfile .
 
-                            # 3. تشغيل الفحص وتمرير الروابط المستقرة للكلاستر مباشرة
+                            # 3. تشغيل الفحص وتمرير رابط الـ ELB الخارجي المستقر
                             docker run --rm \
                               local-sonar-scanner \
                               -Dsonar.host.url="${SONAR_URL}" \
