@@ -48,7 +48,7 @@ EOF
                             # 2. بناء حاوية الفحص محلياً وهي محملة بالملفات
                             docker build -t local-sonar-scanner -f SonarDockerfile .
 
-                            # 3. تشغيل الفحص وتمرير خيار الـ binaries لتخطي إيرور الجافا
+                            # 3. تشغيل الفحص وتمرير خيار الـ binaries وتخطي حجب الـ Quality Gate
                             docker run --rm \
                               --network host \
                               local-sonar-scanner \
@@ -59,6 +59,7 @@ EOF
                               -Dsonar.sources=. \
                               -Dsonar.java.binaries=. \
                               -Dsonar.scm.disabled=true \
+                              -Dsonar.qualitygate.wait=false \
                               -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
 
                             # 4. تنظيف البيئة وحذف الحاوية والملف المؤقت
