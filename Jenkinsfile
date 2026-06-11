@@ -46,7 +46,7 @@ pipeline {
                         # انتظار استقرار النفق الخلفي
                         sleep 10
 
-                        echo "Running targeted source scanner..."
+                        echo "Running fully optimized inclusive source scanner..."
                         docker run --rm \
                           --network host \
                           -v "${WORKSPACE}":/usr/src \
@@ -57,9 +57,10 @@ pipeline {
                           -Dsonar.projectName=e-commerce \
                           -Dsonar.scm.disabled=true \
                           -Dsonar.qualitygate.wait=false \
-                          -Dsonar.sources=/usr/src/cart-cna-microservice,/usr/src/products-cna-microservice,/usr/src/search-cna-microservice,/usr/src/users-cna-microservice,/usr/src/store-ui \
+                          -Dsonar.sources=/usr/src \
                           -Dsonar.java.binaries=/usr/src \
-                          -Dsonar.exclusions="**/node_modules/**,**/.gradle/**,**/gradle/**,**/.next/**,**/*.jar,**/*.bin,**/build/**,**/target/**"
+                          -Dsonar.inclusions="**/*.java,**/*.js,**/*.ts,**/*.html,**/*.css" \
+                          -Dsonar.exclusions="**/node_modules/**,**/.gradle/**,**/gradle/**,**/.next/**,**/*.jar,**/*.bin,**/build/**,**/target/**,**/dist/**"
 
                         echo "Closing the secure tunnel safely..."
                         kill $PF_PID || true
@@ -68,7 +69,7 @@ pipeline {
             }
         }
 
-        // تم تحويلها لبناء متتالي (واحدة تلو الأخرى) لحماية ذاكرة الكلاستر من الاختناق والـ Timeout
+        // بناء متتالي (Sequential) متزن لحماية ذاكرة الكلاستر من الـ Timeout والاختناق
         stage('Build Microservices Images') {
             steps {
                 echo "Building 1/5: Cart Service..."
