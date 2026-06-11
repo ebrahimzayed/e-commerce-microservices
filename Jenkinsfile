@@ -8,7 +8,7 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
 
-        // التوجيه المستقر لبورت السونار كيوب المحلي
+        // بورت السونار كيوب المحلي المستقر
         SONAR_URL       = "http://localhost:9001"
     }
 
@@ -32,23 +32,23 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                /* استخدام الـ ID المطابق للـ Credentials في جينكنز */
+                /* استخدام الـ ID المتطابق مع الـ Credentials في جينكنز */
                 withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
                     withSonarQubeEnv('sonarqube') {
                         sh '''
                             echo "Starting SonarQube Scan..."
 
-                            # 1. إنشاء Dockerfile مؤقت يضمن نسخ الكود بالكامل داخل الحاوية
+                            # 1. إنشاء Dockerfile مؤقت لنسخ كود المشروع بالكامل داخل الحاوية
                             cat << 'EOF' > SonarDockerfile
                             FROM sonarsource/sonar-scanner-cli:latest
                             COPY . /usr/src
                             WORKDIR /usr/src
 EOF
 
-                            # 2. بناء حاوية الفحص محلياً محملة بملفات المشروع
+                            # 2. بناء حاوية الفحص محلياً وهي محملة بالملفات
                             docker build -t local-sonar-scanner -f SonarDockerfile .
 
-                            # 3. تشغيل الفحص باستخدام الحاوية المجهزة والـ Token الصح
+                            # 3. تشغيل الفحص وتمرير خيار الـ binaries لتخطي إيرور الجافا
                             docker run --rm \
                               --network host \
                               local-sonar-scanner \
@@ -57,6 +57,7 @@ EOF
                               -Dsonar.projectKey=e-commerce \
                               -Dsonar.projectName=e-commerce \
                               -Dsonar.sources=. \
+                              -Dsonar.java.binaries=. \
                               -Dsonar.scm.disabled=true \
                               -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
 
@@ -160,7 +161,7 @@ EOF
                         kubectl apply -f infra/k8s/apps/base/users/ -n e-commerce || true
                         kubectl apply -f infra/k8s/apps/base/store-ui/ -n e-commerce || true
 
-                        # التحديث المستمر للـ Images داخل الـ Deployments الخاصة بالمشروع
+                        # عمل تحديث للـ Images داخل الـ Deployments مباشرة وبشكل مستقر
                         kubectl set image deployment/cart-deployment cart=${ECR_REGISTRY}/cart:${IMAGE_TAG} -n e-commerce
                         kubectl set image deployment/products-deployment products=${ECR_REGISTRY}/products:${IMAGE_TAG} -n e-commerce
                         kubectl set image deployment/search-deployment search=${ECR_REGISTRY}/search:${IMAGE_TAG} -n e-commerce
