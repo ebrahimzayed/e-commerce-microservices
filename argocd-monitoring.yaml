@@ -30,6 +30,9 @@ spec:
           enabled: true
           serviceMonitor:
             https: true
+            scheme: https
+            tlsConfig:
+              insecureSkipVerify: true
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: monitoring
