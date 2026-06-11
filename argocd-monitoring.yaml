@@ -29,7 +29,7 @@ spec:
         kubelet:
           enabled: true
           serviceMonitor:
-            https: false
+            https: true
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: monitoring
