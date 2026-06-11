@@ -8,15 +8,18 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
 
-        // IMPORTANT: SonarQube runs on host port 9001
-        SONAR_URL       = "http://host.docker.internal:9001"
+        // SonarQube (Docker host mode → localhost)
+        SONAR_URL       = "http://localhost:9001"
     }
 
     stages {
 
         stage('Checkout') {
             steps {
-                checkout scm
+                checkout scmGit(
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[url: 'https://github.com/ebrahimzayed/e-commerce-microservices.git']]
+                )
             }
         }
 
@@ -24,11 +27,8 @@ pipeline {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     sh '''
-                        trivy fs \
-                          --exit-code 0 \
-                          --severity HIGH,CRITICAL \
-                          --format table \
-                          .
+                        trivy fs --exit-code 0 --severity HIGH,CRITICAL \
+                        --format table .
                     '''
                 }
             }
@@ -38,30 +38,27 @@ pipeline {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
 
-                    withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_AUTH_TOKEN')]) {
+                    withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
 
                         sh '''
-cat << 'EOF' > SonarDockerfile
-FROM sonarsource/sonar-scanner-cli:latest
-COPY . /usr/src
-WORKDIR /usr/src
-EOF
+cat <<EOF > sonar-scanner.sh
+#!/bin/bash
 
-docker build -t local-sonar-scanner -f SonarDockerfile .
-
-docker run --rm --network host \
-  -v /var/jenkins_home/workspace:/usr/src \
-  local-sonar-scanner \
-  -Dsonar.host.url=${SONAR_URL} \
-  -Dsonar.login=${SONAR_AUTH_TOKEN} \
+docker run --rm \
+  --network host \
+  -v $WORKSPACE:/usr/src \
+  sonarsource/sonar-scanner-cli:latest \
+  -Dsonar.host.url=http://localhost:9001 \
+  -Dsonar.token=$SONAR_TOKEN \
   -Dsonar.projectKey=e-commerce \
   -Dsonar.projectName=e-commerce \
   -Dsonar.sources=. \
   -Dsonar.scm.disabled=true \
-  -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+  -Dsonar.exclusions=**/node_modules/**,**/build/**,**/dist/**,**/target/**
+EOF
 
-docker rmi local-sonar-scanner || true
-rm -f SonarDockerfile
+chmod +x sonar-scanner.sh
+./sonar-scanner.sh
                         '''
                     }
                 }
@@ -74,7 +71,7 @@ rm -f SonarDockerfile
                 stage('Build Cart') {
                     steps {
                         sh '''
-                            cd ./cart-cna-microservice
+                            cd cart-cna-microservice
                             chmod +x gradlew
                             ./gradlew bootJar -x test
                             cd ..
@@ -113,20 +110,12 @@ rm -f SonarDockerfile
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     sh '''
-                        trivy image --exit-code 0 --severity HIGH,CRITICAL \
-                          ${ECR_REGISTRY}/cart:${IMAGE_TAG}
-
-                        trivy image --exit-code 0 --severity HIGH,CRITICAL \
-                          ${ECR_REGISTRY}/products:${IMAGE_TAG}
-
-                        trivy image --exit-code 0 --severity HIGH,CRITICAL \
-                          ${ECR_REGISTRY}/search:${IMAGE_TAG}
-
-                        trivy image --exit-code 0 --severity HIGH,CRITICAL \
-                          ${ECR_REGISTRY}/users:${IMAGE_TAG}
-
-                        trivy image --exit-code 0 --severity HIGH,CRITICAL \
-                          ${ECR_REGISTRY}/store-ui:${IMAGE_TAG}
+                        for img in cart products search users store-ui
+                        do
+                          trivy image --exit-code 0 --severity HIGH,CRITICAL \
+                          --format table \
+                          ${ECR_REGISTRY}/$img:${IMAGE_TAG}
+                        done
                     '''
                 }
             }
@@ -136,9 +125,10 @@ rm -f SonarDockerfile
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
                                   credentialsId: 'aws-credentials']]) {
+
                     sh '''
                         aws ecr get-login-password --region ${AWS_REGION} | \
-                            docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                        docker login --username AWS --password-stdin ${ECR_REGISTRY}
 
                         docker push ${ECR_REGISTRY}/cart:${IMAGE_TAG}
                         docker push ${ECR_REGISTRY}/products:${IMAGE_TAG}
@@ -154,8 +144,12 @@ rm -f SonarDockerfile
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
                                   credentialsId: 'aws-credentials']]) {
+
                     sh '''
                         aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
+
+                        kubectl create namespace e-commerce --dry-run=client -o yaml | kubectl apply -f -
+                        kubectl create namespace shared-services --dry-run=client -o yaml | kubectl apply -f -
 
                         kubectl apply -f infra/k8s/shared-services/base/redis/ -n shared-services || true
                         kubectl apply -f infra/k8s/shared-services/base/mongodb/ -n shared-services || true
@@ -167,19 +161,19 @@ rm -f SonarDockerfile
                         kubectl apply -f infra/k8s/apps/base/store-ui/ -n e-commerce || true
 
                         kubectl set image deployment/cart-deployment \
-                          cart=${ECR_REGISTRY}/cart:${IMAGE_TAG} -n e-commerce
+                            cart=${ECR_REGISTRY}/cart:${IMAGE_TAG} -n e-commerce
 
                         kubectl set image deployment/products-deployment \
-                          products=${ECR_REGISTRY}/products:${IMAGE_TAG} -n e-commerce
+                            products=${ECR_REGISTRY}/products:${IMAGE_TAG} -n e-commerce
 
                         kubectl set image deployment/search-deployment \
-                          search=${ECR_REGISTRY}/search:${IMAGE_TAG} -n e-commerce
+                            search=${ECR_REGISTRY}/search:${IMAGE_TAG} -n e-commerce
 
                         kubectl set image deployment/users-deployment \
-                          users=${ECR_REGISTRY}/users:${IMAGE_TAG} -n e-commerce
+                            users=${ECR_REGISTRY}/users:${IMAGE_TAG} -n e-commerce
 
                         kubectl set image deployment/store-ui-deployment \
-                          store-ui=${ECR_REGISTRY}/store-ui:${IMAGE_TAG} -n e-commerce
+                            store-ui=${ECR_REGISTRY}/store-ui:${IMAGE_TAG} -n e-commerce
 
                         kubectl rollout status deployment -n e-commerce --timeout=300s
                     '''
@@ -194,6 +188,7 @@ rm -f SonarDockerfile
                       --pid=host \
                       -v /etc:/etc:ro \
                       -v /var:/var:ro \
+                      -v ~/.kube:/root/.kube:ro \
                       aquasec/kube-bench:latest run --exit-code 0
                 '''
             }
@@ -202,7 +197,7 @@ rm -f SonarDockerfile
 
     post {
         success {
-            echo 'CI/CD Pipeline Succeeded'
+            echo 'CI/CD Pipeline Completed Successfully'
         }
 
         failure {
