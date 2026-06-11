@@ -35,22 +35,20 @@ pipeline {
                             echo "Updating Kubeconfig..."
                             aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
 
-                            echo "Fetching the exact active SonarQube Pod Name..."
-                            # جلب اسم الـ Pod المباشر الشغال حالياً
-                            SONAR_POD=$(kubectl get pods -n sonarqube -l app.kubernetes.io/name=sonarqube -o jsonpath='{.items[0].metadata.name}')
+                            echo "Fetching active SonarQube Pod Name safely..."
+                            # جلب اسم أول Pod متاح داخل الـ Namespace لتجنب مشاكل الـ Selectors المختلفة
+                            SONAR_POD=$(kubectl get pods -n sonarqube -o jsonpath='{.items[0].metadata.name}')
                             echo "Targeting Pod: $SONAR_POD"
 
-                            echo "Opening a secure direct background tunnel to the Pod..."
-                            # فتح نفق على بورت 9001 على السيرفر المحلي محمي وخلفي
-                            kubectl port-forward pod/$SONAR_POD 9001:9000 -n sonarqube > pf.log 2>&1 &
+                            echo "Opening a secure direct background tunnel listening on all interfaces..."
+                            # تشغيل النفق على التبويب 0.0.0.0 حتى تتمكن حاوية الـ Docker من الوصول إليه
+                            kubectl port-forward pod/$SONAR_POD 9001:9000 -n sonarqube --address 0.0.0.0 > pf.log 2>&1 &
                             PF_PID=$!
 
-                            # انتشاره 7 ثوانٍ لضمان استقرار النفق
-                            sleep 7
+                            # مهلة زمنية كافية لضمان استقرار وربط النفق بالخلفية
+                            sleep 10
 
-                            echo "Running the scanner directly using our secure tunnel connection..."
-                            
-                            # تشغيل الـ Scanner الداخلي باستخدام الـ Host Network لضرب الـ Localhost 9001 المفتوح
+                            echo "Running the scanner directly via Host local network bridge..."
                             docker run --rm \
                               --network host \
                               -v "${WORKSPACE}":/usr/src \
