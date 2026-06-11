@@ -8,8 +8,8 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
         
-        // 🚀 الرابط الداخلي الرسمي للسونار داخل الكلاستر (DNS الداخلي)
-        INTERNAL_SONAR  = "http://sonarqube-sonarqube.sonarqube.svc.cluster.local:9000"
+        // استخدام الـ Service Name الداخلي المباشر والمستقر تماماً
+        SONAR_URL       = "http://sonarqube-sonarqube.sonarqube.svc.cluster.local:9000"
     }
 
     stages {
@@ -32,43 +32,27 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials'],
-                                 [string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]]) {
+                // استخدام الـ Credentials المعتمدة للسونار بأمان ونظافة
+                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
+                    // تعريف بيئة السونار الرسمية المدمجة داخل جينكينز
                     withSonarQubeEnv('sonarqube') {
-                        sh '''
-                            echo "Updating Kubeconfig to access EKS..."
-                            aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
-                            
-                            echo "Launching Internal Kubernetes Scanner Pod..."
-                            
-                            # 1. حذف أي اسكانر قديم لو كان معلقاً
-                            kubectl delete pod sonar-worker-scanner -n sonarqube --ignore-not-found=true
-                            
-                            # 2. تشغيل الـ Scanner كـ Pod داخلي يقرأ السيرفس مباشرة وكسر قيود الشبكة الخارحية والـ Security Groups
-                            kubectl run sonar-worker-scanner \
-                              -n sonarqube \
-                              --restart=Never \
-                              --image=sonarsource/sonar-scanner-cli:latest \
-                              --env="SONAR_HOST_URL=${INTERNAL_SONAR}" \
-                              --env="SONAR_LOGIN=${SONAR_AUTH_TOKEN}" \
-                              -- \
-                              -Dsonar.host.url="${INTERNAL_SONAR}" \
-                              -Dsonar.login="${SONAR_AUTH_TOKEN}" \
-                              -Dsonar.projectKey=e-commerce \
-                              -Dsonar.projectName=e-commerce \
-                              -Dsonar.sources=. \
-                              -Dsonar.scm.disabled=true \
-                              -Dsonar.qualitygate.wait=false
-                            
-                            echo "Waiting for SonarQube Scan to initialize and run..."
-                            sleep 15
-                            
-                            # طباعة الـ Logs الخاصة بالفحص للتأكد من سير العملية بنجاح
-                            kubectl logs sonar-worker-scanner -n sonarqube || true
-                            
-                            echo "Cleaning up internal scanner pod..."
-                            kubectl delete pod sonar-worker-scanner -n sonarqube --ignore-not-found=true
-                        '''
+                        script {
+                            // 🚀 الحل السحري: استدعاء أداة الاسكانر المحلية لجينكينز لفحص المجلد الحالي مباشرة
+                            def scannerHome = tool 'sonarqube'
+                            sh """
+                                echo "Starting Native SonarQube Scan on Workspace..."
+                                ${scannerHome}/bin/sonar-scanner \
+                                  -Dsonar.host.url="${SONAR_URL}" \
+                                  -Dsonar.login="${SONAR_AUTH_TOKEN}" \
+                                  -Dsonar.projectKey=e-commerce \
+                                  -Dsonar.projectName=e-commerce \
+                                  -Dsonar.sources=. \
+                                  -Dsonar.java.binaries=. \
+                                  -Dsonar.scm.disabled=true \
+                                  -Dsonar.qualitygate.wait=false \
+                                  -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+                            """
+                        }
                     }
                 }
             }
