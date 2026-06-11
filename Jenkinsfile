@@ -8,7 +8,7 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
 
-        // SonarQube (Docker host mode → localhost)
+        // SonarQube (Docker host)
         SONAR_URL       = "http://localhost:9001"
     }
 
@@ -16,19 +16,18 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                checkout scmGit(
-                    branches: [[name: '*/main']],
-                    userRemoteConfigs: [[url: 'https://github.com/ebrahimzayed/e-commerce-microservices.git']]
-                )
+                checkout scm
             }
         }
 
-        stage('Trivy File System Scan') {
+        stage('Trivy - Source Scan') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     sh '''
-                        trivy fs --exit-code 0 --severity HIGH,CRITICAL \
-                        --format table .
+                        trivy fs \
+                          --exit-code 0 \
+                          --severity HIGH,CRITICAL \
+                          --format table .
                     '''
                 }
             }
@@ -41,9 +40,7 @@ pipeline {
                     withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
 
                         sh '''
-cat <<EOF > sonar-scanner.sh
-#!/bin/bash
-
+cat <<EOF > sonar-run.sh
 docker run --rm \
   --network host \
   -v $WORKSPACE:/usr/src \
@@ -57,18 +54,18 @@ docker run --rm \
   -Dsonar.exclusions=**/node_modules/**,**/build/**,**/dist/**,**/target/**
 EOF
 
-chmod +x sonar-scanner.sh
-./sonar-scanner.sh
+chmod +x sonar-run.sh
+./sonar-run.sh
                         '''
                     }
                 }
             }
         }
 
-        stage('Build Images') {
+        stage('Build Docker Images') {
             parallel {
 
-                stage('Build Cart') {
+                stage('Cart') {
                     steps {
                         sh '''
                             cd cart-cna-microservice
@@ -80,25 +77,25 @@ chmod +x sonar-scanner.sh
                     }
                 }
 
-                stage('Build Products') {
+                stage('Products') {
                     steps {
                         sh 'docker build -t ${ECR_REGISTRY}/products:${IMAGE_TAG} ./products-cna-microservice'
                     }
                 }
 
-                stage('Build Search') {
+                stage('Search') {
                     steps {
                         sh 'docker build -t ${ECR_REGISTRY}/search:${IMAGE_TAG} ./search-cna-microservice'
                     }
                 }
 
-                stage('Build Users') {
+                stage('Users') {
                     steps {
                         sh 'docker build -t ${ECR_REGISTRY}/users:${IMAGE_TAG} ./users-cna-microservice'
                     }
                 }
 
-                stage('Build Store UI') {
+                stage('Store UI') {
                     steps {
                         sh 'docker build -t ${ECR_REGISTRY}/store-ui:${IMAGE_TAG} ./store-ui'
                     }
@@ -106,15 +103,18 @@ chmod +x sonar-scanner.sh
             }
         }
 
-        stage('Trivy Image Scan') {
+        stage('Trivy - Image Scan') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     sh '''
                         for img in cart products search users store-ui
                         do
-                          trivy image --exit-code 0 --severity HIGH,CRITICAL \
-                          --format table \
-                          ${ECR_REGISTRY}/$img:${IMAGE_TAG}
+                          trivy image \
+                            --exit-code 0 \
+                            --severity HIGH,CRITICAL \
+                            --cache-dir /var/lib/trivy-cache \
+                            --scanners vuln \
+                            ${ECR_REGISTRY}/$img:${IMAGE_TAG}
                         done
                     '''
                 }
@@ -161,19 +161,19 @@ chmod +x sonar-scanner.sh
                         kubectl apply -f infra/k8s/apps/base/store-ui/ -n e-commerce || true
 
                         kubectl set image deployment/cart-deployment \
-                            cart=${ECR_REGISTRY}/cart:${IMAGE_TAG} -n e-commerce
+                          cart=${ECR_REGISTRY}/cart:${IMAGE_TAG} -n e-commerce
 
                         kubectl set image deployment/products-deployment \
-                            products=${ECR_REGISTRY}/products:${IMAGE_TAG} -n e-commerce
+                          products=${ECR_REGISTRY}/products:${IMAGE_TAG} -n e-commerce
 
                         kubectl set image deployment/search-deployment \
-                            search=${ECR_REGISTRY}/search:${IMAGE_TAG} -n e-commerce
+                          search=${ECR_REGISTRY}/search:${IMAGE_TAG} -n e-commerce
 
                         kubectl set image deployment/users-deployment \
-                            users=${ECR_REGISTRY}/users:${IMAGE_TAG} -n e-commerce
+                          users=${ECR_REGISTRY}/users:${IMAGE_TAG} -n e-commerce
 
                         kubectl set image deployment/store-ui-deployment \
-                            store-ui=${ECR_REGISTRY}/store-ui:${IMAGE_TAG} -n e-commerce
+                          store-ui=${ECR_REGISTRY}/store-ui:${IMAGE_TAG} -n e-commerce
 
                         kubectl rollout status deployment -n e-commerce --timeout=300s
                     '''
@@ -181,7 +181,7 @@ chmod +x sonar-scanner.sh
             }
         }
 
-        stage('KubeBench Scan') {
+        stage('KubeBench') {
             steps {
                 sh '''
                     docker run --rm \
@@ -197,11 +197,11 @@ chmod +x sonar-scanner.sh
 
     post {
         success {
-            echo 'CI/CD Pipeline Completed Successfully'
+            echo "CI/CD Completed Successfully"
         }
 
         failure {
-            echo 'CI/CD Pipeline Failed'
+            echo "CI/CD Failed - check logs"
         }
     }
 }
