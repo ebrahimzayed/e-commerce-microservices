@@ -46,7 +46,7 @@ pipeline {
                         # انتظار استقرار النفق الخلفي
                         sleep 10
 
-                        echo "Running fully optimized inclusive source scanner..."
+                        echo "Running deep search source scanner..."
                         docker run --rm \
                           --network host \
                           -v "${WORKSPACE}":/usr/src \
@@ -57,11 +57,10 @@ pipeline {
                           -Dsonar.projectName=e-commerce \
                           -Dsonar.scm.disabled=true \
                           -Dsonar.qualitygate.wait=false \
-                          -Dsonar.sources=/usr/src \
-                          -Dsonar.java.binaries=/usr/src \
-                          -Dsonar.inclusions="**/*.java,**/*.js,**/*.ts,**/*.html,**/*.css" \
-                          -Dsonar.exclusions="**/node_modules/**,**/.gradle/**,**/gradle/**,**/.next/**,**/*.jar,**/*.bin,**/build/**,**/target/**,**/dist/**"
-
+                          -Dsonar.sources=. \
+                          -Dsonar.java.binaries=. \
+                          -Dsonar.exclusions="**/node_modules/**,**/.gradle/**,**/gradle/**,**/.next/**,**/*.jar,**/*.bin"
+                        
                         echo "Closing the secure tunnel safely..."
                         kill $PF_PID || true
                     '''
