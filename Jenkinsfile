@@ -7,9 +7,9 @@ pipeline {
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
-
-        // الرابط الخارجي المعتمد للـ Load Balancer
-        SONAR_URL       = "http://a2af8231d1b8b43199b8c82e28abdb86-1523237720.eu-west-1.elb.amazonaws.com:9000"
+        
+        // 🚀 هنكلم اللوكال هيرست لأننا هنفتح نفق مباشر للكلاستر
+        SONAR_URL       = "http://127.0.0.1:9000"
     }
 
     stages {
@@ -32,27 +32,41 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                // 🚀 إضافة catchError لضمان استمرار الـ Pipeline حتى لو السيرفر يمر بمرحلة إعادة تشغيل على AWS
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
-                        withSonarQubeEnv('sonarqube') {
-                            sh '''
-                                echo "Executing Clean SonarQube Scan..."
-                                
-                                docker run --rm \
-                                  -v "${WORKSPACE}":/usr/src \
-                                  sonarsource/sonar-scanner-cli:latest \
-                                  -Dsonar.host.url="${SONAR_URL}" \
-                                  -Dsonar.login="$SONAR_AUTH_TOKEN" \
-                                  -Dsonar.projectKey=e-commerce \
-                                  -Dsonar.projectName=e-commerce \
-                                  -Dsonar.sources=. \
-                                  -Dsonar.java.binaries=. \
-                                  -Dsonar.scm.disabled=true \
-                                  -Dsonar.qualitygate.wait=false \
-                                  -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
-                            '''
-                        }
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials'],
+                                 [string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]]) {
+                    withSonarQubeEnv('sonarqube') {
+                        sh '''
+                            echo "Updating Kubeconfig and creating secure tunnel to SonarQube..."
+                            aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
+                            
+                            # 1. فتح نفق داخلي (Port-Forward) في الخلفية وتوجيهه لبورت 9000 محلياً
+                            kubectl port-forward svc/sonarqube-sonarqube 9000:9000 -n sonarqube > pf.log 2>&1 &
+                            PF_PID=$!
+                            
+                            # الانتظار 5 ثوانٍ للتأكد من قيام النفق
+                            sleep 5
+                            
+                            echo "Starting SonarQube Scan through the secure tunnel..."
+                            
+                            # 2. تشغيل الفحص وتمرير الشبكة المحلية (host) للوصول للـ port-forward
+                            docker run --rm \
+                              --network host \
+                              -v "${WORKSPACE}":/usr/src \
+                              sonarsource/sonar-scanner-cli:latest \
+                              -Dsonar.host.url="${SONAR_URL}" \
+                              -Dsonar.login="$SONAR_AUTH_TOKEN" \
+                              -Dsonar.projectKey=e-commerce \
+                              -Dsonar.projectName=e-commerce \
+                              -Dsonar.sources=. \
+                              -Dsonar.java.binaries=. \
+                              -Dsonar.scm.disabled=true \
+                              -Dsonar.qualitygate.wait=false \
+                              -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+                            
+                            # 3. غلق النفق بأمان بعد انتهاء الفحص وتنظيف العمليات
+                            echo "Closing the secure tunnel..."
+                            kill $PF_PID || true
+                        '''
                     }
                 }
             }
