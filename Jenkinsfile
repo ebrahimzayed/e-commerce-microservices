@@ -8,8 +8,8 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
 
-        // بورت السونار كيوب المحلي المستقر
-        SONAR_URL       = "http://localhost:9001"
+        // 🚀 الرابط الداخلي المستقر للـ SonarQube المعتمد على الـ Cluster Service مباشرة
+        SONAR_URL       = "http://sonarqube-sonarqube.sonarqube.svc.cluster.local:9000"
     }
 
     stages {
@@ -32,7 +32,6 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                /* استخدام الـ ID المتطابق مع الـ Credentials في جينكنز */
                 withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
                     withSonarQubeEnv('sonarqube') {
                         sh '''
@@ -48,9 +47,8 @@ EOF
                             # 2. بناء حاوية الفحص محلياً وهي محملة بالملفات
                             docker build -t local-sonar-scanner -f SonarDockerfile .
 
-                            # 3. تشغيل الفحص وتمرير خيار الـ binaries وتخطي حجب الـ Quality Gate
+                            # 3. تشغيل الفحص وتمرير الروابط المستقرة للكلاستر مباشرة
                             docker run --rm \
-                              --network host \
                               local-sonar-scanner \
                               -Dsonar.host.url="${SONAR_URL}" \
                               -Dsonar.login="$SONAR_AUTH_TOKEN" \
@@ -73,7 +71,6 @@ EOF
 
         stage('Build Images') {
             parallel {
-
                 stage('Cart') {
                     steps {
                         sh '''
