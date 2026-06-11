@@ -54,7 +54,7 @@ pipeline {
                         
                         export PATH="$WORKSPACE/sonar-scanner-5.0.1.3006-linux/bin:$PATH"
 
-                        echo "Running Native Embedded Multi-Module Scanner..."
+                        echo "Running Embedded Native Scanner directly from the active code workspace..."
                         sonar-scanner \
                           -Dsonar.host.url="http://127.0.0.1:9001" \
                           -Dsonar.login="${SONAR_STATIC_TOKEN}" \
@@ -62,21 +62,8 @@ pipeline {
                           -Dsonar.projectName=e-commerce \
                           -Dsonar.scm.disabled=true \
                           -Dsonar.qualitygate.wait=false \
-                          -Dsonar.modules=cart,products,search,users,storeui \
-                          -Dcart.sonar.projectName="Cart Service" \
-                          -Dcart.sonar.sources=cart-cna-microservice \
-                          -Dcart.sonar.java.binaries=. \
-                          -Dproducts.sonar.projectName="Products Service" \
-                          -Dproducts.sonar.sources=products-cna-microservice \
-                          -Dproducts.sonar.java.binaries=. \
-                          -Dsearch.sonar.projectName="Search Service" \
-                          -Dsearch.sonar.sources=search-cna-microservice \
-                          -Dsearch.sonar.java.binaries=. \
-                          -Dusers.sonar.projectName="Users Service" \
-                          -Dusers.sonar.sources=users-cna-microservice \
-                          -Dusers.sonar.java.binaries=. \
-                          -Dstoreui.sonar.projectName="Store UI" \
-                          -Dstoreui.sonar.sources=store-ui \
+                          -Dsonar.sources=. \
+                          -Dsonar.java.binaries=. \
                           -Dsonar.exclusions="**/node_modules/**,**/.gradle/**,**/gradle/**,**/.next/**,**/*.jar,**/*.bin,**/build/**,**/target/**"
 
                         echo "Closing the secure tunnel safely..."
