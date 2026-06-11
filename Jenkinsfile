@@ -19,15 +19,11 @@ pipeline {
             }
         }
 
-        stage('Trivy File System Scan') {
+        stage('Trivy FS Scan') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     sh '''
-                        trivy fs \
-                          --exit-code 0 \
-                          --severity HIGH,CRITICAL \
-                          --format table \
-                          .
+                        trivy fs --exit-code 0 --severity HIGH,CRITICAL .
                     '''
                 }
             }
@@ -37,12 +33,15 @@ pipeline {
             steps {
                 withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
                     sh '''
+                        echo "Starting SonarQube Scan..."
+
                         docker run --rm \
                           --network host \
                           -v "$WORKSPACE:/usr/src" \
+                          -w /usr/src \
                           sonarsource/sonar-scanner-cli:latest \
                           -Dsonar.host.url=http://localhost:9001 \
-                          -Dsonar.token=$SONAR_TOKEN \
+                          -Dsonar.token="$SONAR_TOKEN" \
                           -Dsonar.projectKey=e-commerce \
                           -Dsonar.projectName=e-commerce \
                           -Dsonar.sources=. \
@@ -55,6 +54,7 @@ pipeline {
 
         stage('Build Images') {
             parallel {
+
                 stage('Cart') {
                     steps {
                         sh '''
@@ -69,33 +69,25 @@ pipeline {
 
                 stage('Products') {
                     steps {
-                        sh '''
-                            docker build -t ${ECR_REGISTRY}/products:${IMAGE_TAG} products-cna-microservice
-                        '''
+                        sh 'docker build -t ${ECR_REGISTRY}/products:${IMAGE_TAG} products-cna-microservice'
                     }
                 }
 
                 stage('Search') {
                     steps {
-                        sh '''
-                            docker build -t ${ECR_REGISTRY}/search:${IMAGE_TAG} search-cna-microservice
-                        '''
+                        sh 'docker build -t ${ECR_REGISTRY}/search:${IMAGE_TAG} search-cna-microservice'
                     }
                 }
 
                 stage('Users') {
                     steps {
-                        sh '''
-                            docker build -t ${ECR_REGISTRY}/users:${IMAGE_TAG} users-cna-microservice
-                        '''
+                        sh 'docker build -t ${ECR_REGISTRY}/users:${IMAGE_TAG} users-cna-microservice'
                     }
                 }
 
                 stage('Store UI') {
                     steps {
-                        sh '''
-                            docker build -t ${ECR_REGISTRY}/store-ui:${IMAGE_TAG} store-ui
-                        '''
+                        sh 'docker build -t ${ECR_REGISTRY}/store-ui:${IMAGE_TAG} store-ui'
                     }
                 }
             }
@@ -106,10 +98,8 @@ pipeline {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     sh '''
                         for img in cart products search users store-ui; do
-                          trivy image \
-                            --exit-code 0 \
-                            --severity HIGH,CRITICAL \
-                            ${ECR_REGISTRY}/${img}:${IMAGE_TAG}
+                          trivy image --exit-code 0 --severity HIGH,CRITICAL \
+                          ${ECR_REGISTRY}/$img:${IMAGE_TAG}
                         done
                     '''
                 }
@@ -122,7 +112,7 @@ pipeline {
                                   credentialsId: 'aws-credentials']]) {
                     sh '''
                         aws ecr get-login-password --region ${AWS_REGION} | \
-                          docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                        docker login --username AWS --password-stdin ${ECR_REGISTRY}
 
                         docker push ${ECR_REGISTRY}/cart:${IMAGE_TAG}
                         docker push ${ECR_REGISTRY}/products:${IMAGE_TAG}
@@ -190,11 +180,10 @@ pipeline {
 
     post {
         success {
-            echo "CI/CD Pipeline Completed Successfully"
+            echo "CI/CD Pipeline SUCCESS"
         }
-
         failure {
-            echo "Pipeline Failed - check logs"
+            echo "CI/CD Pipeline FAILED"
         }
     }
 }
