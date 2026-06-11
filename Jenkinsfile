@@ -8,7 +8,7 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
 
-        // التوجيه المستقر للبورت المحلي للحاوية
+        // التوجيه المستقر لبورت السونار كيوب المحلي
         SONAR_URL       = "http://localhost:9001"
     }
 
@@ -32,17 +32,26 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                /* استخدام الـ ID المضمون والمتطابق مع الـ Jenkins */
+                /* استخدام الـ ID المطابق للـ Credentials في جينكنز */
                 withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
                     withSonarQubeEnv('sonarqube') {
                         sh '''
                             echo "Starting SonarQube Scan..."
 
+                            # 1. إنشاء Dockerfile مؤقت يضمن نسخ الكود بالكامل داخل الحاوية
+                            cat << 'EOF' > SonarDockerfile
+                            FROM sonarsource/sonar-scanner-cli:latest
+                            COPY . /usr/src
+                            WORKDIR /usr/src
+EOF
+
+                            # 2. بناء حاوية الفحص محلياً محملة بملفات المشروع
+                            docker build -t local-sonar-scanner -f SonarDockerfile .
+
+                            # 3. تشغيل الفحص باستخدام الحاوية المجهزة والـ Token الصح
                             docker run --rm \
                               --network host \
-                              -v "$WORKSPACE:/usr/src" \
-                              -w /usr/src \
-                              sonarsource/sonar-scanner-cli:latest \
+                              local-sonar-scanner \
                               -Dsonar.host.url="${SONAR_URL}" \
                               -Dsonar.login="$SONAR_AUTH_TOKEN" \
                               -Dsonar.projectKey=e-commerce \
@@ -50,6 +59,10 @@ pipeline {
                               -Dsonar.sources=. \
                               -Dsonar.scm.disabled=true \
                               -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+
+                            # 4. تنظيف البيئة وحذف الحاوية والملف المؤقت
+                            docker rmi local-sonar-scanner || true
+                            rm -f SonarDockerfile
                         '''
                     }
                 }
@@ -147,7 +160,7 @@ pipeline {
                         kubectl apply -f infra/k8s/apps/base/users/ -n e-commerce || true
                         kubectl apply -f infra/k8s/apps/base/store-ui/ -n e-commerce || true
 
-                        # تنظيف وتحديث مستمر لملفات الأبليكيشن بدون تضارب في الـ Services
+                        # التحديث المستمر للـ Images داخل الـ Deployments الخاصة بالمشروع
                         kubectl set image deployment/cart-deployment cart=${ECR_REGISTRY}/cart:${IMAGE_TAG} -n e-commerce
                         kubectl set image deployment/products-deployment products=${ECR_REGISTRY}/products:${IMAGE_TAG} -n e-commerce
                         kubectl set image deployment/search-deployment search=${ECR_REGISTRY}/search:${IMAGE_TAG} -n e-commerce
