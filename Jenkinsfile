@@ -7,6 +7,8 @@ pipeline {
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_TAG       = "${BUILD_NUMBER}"
         EKS_CLUSTER     = 'ecommerce-eks'
+        // حقن الرمز الجديد مباشرة في البيئة لضمان تخطي أي تعليق في الخادم
+        SONAR_STATIC_TOKEN = 'squ_4a825171cf51697599473bfb7d31d4f9b4b76587'
     }
 
     stages {
@@ -30,43 +32,39 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
-                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
-                        sh '''
-                            echo "Updating Kubeconfig..."
-                            aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
+                    sh '''
+                        echo "Updating Kubeconfig..."
+                        aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
 
-                            echo "Fetching active SonarQube Pod Name safely..."
-                            # جلب اسم أول Pod متاح داخل الـ Namespace لتجنب مشاكل الـ Selectors المختلفة
-                            SONAR_POD=$(kubectl get pods -n sonarqube -o jsonpath='{.items[0].metadata.name}')
-                            echo "Targeting Pod: $SONAR_POD"
+                        echo "Fetching active SonarQube Pod Name safely..."
+                        SONAR_POD=$(kubectl get pods -n sonarqube -o jsonpath='{.items[0].metadata.name}')
+                        echo "Targeting Pod: $SONAR_POD"
 
-                            echo "Opening a secure direct background tunnel listening on all interfaces..."
-                            # تشغيل النفق على التبويب 0.0.0.0 حتى تتمكن حاوية الـ Docker من الوصول إليه
-                            kubectl port-forward pod/$SONAR_POD 9001:9000 -n sonarqube --address 0.0.0.0 > pf.log 2>&1 &
-                            PF_PID=$!
+                        echo "Opening a secure direct background tunnel listening on all interfaces..."
+                        kubectl port-forward pod/$SONAR_POD 9001:9000 -n sonarqube --address 0.0.0.0 > pf.log 2>&1 &
+                        PF_PID=$!
 
-                            # مهلة زمنية كافية لضمان استقرار وربط النفق بالخلفية
-                            sleep 10
+                        # انتظار استقرار النفق الخلفي
+                        sleep 10
 
-                            echo "Running the scanner directly via Host local network bridge..."
-                            docker run --rm \
-                              --network host \
-                              -v "${WORKSPACE}":/usr/src \
-                              sonarsource/sonar-scanner-cli:latest \
-                              -Dsonar.host.url="http://127.0.0.1:9001" \
-                              -Dsonar.login="$SONAR_AUTH_TOKEN" \
-                              -Dsonar.projectKey=e-commerce \
-                              -Dsonar.projectName=e-commerce \
-                              -Dsonar.sources=. \
-                              -Dsonar.java.binaries=. \
-                              -Dsonar.scm.disabled=true \
-                              -Dsonar.qualitygate.wait=false \
-                              -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
+                        echo "Running the scanner directly via Host local network bridge..."
+                        docker run --rm \
+                          --network host \
+                          -v "${WORKSPACE}":/usr/src \
+                          sonarsource/sonar-scanner-cli:latest \
+                          -Dsonar.host.url="http://127.0.0.1:9001" \
+                          -Dsonar.login="${SONAR_STATIC_TOKEN}" \
+                          -Dsonar.projectKey=e-commerce \
+                          -Dsonar.projectName=e-commerce \
+                          -Dsonar.sources=. \
+                          -Dsonar.java.binaries=. \
+                          -Dsonar.scm.disabled=true \
+                          -Dsonar.qualitygate.wait=false \
+                          -Dsonar.exclusions="**/node_modules/**,**/build/**,**/dist/**,**/.gradle/**,**/target/**"
 
-                            echo "Closing the secure tunnel safely..."
-                            kill $PF_PID || true
-                        '''
-                    }
+                        echo "Closing the secure tunnel safely..."
+                        kill $PF_PID || true
+                    '''
                 }
             }
         }
