@@ -22,12 +22,21 @@ const Cart = () => {
     const handleAdd = () => setQuantity(textQuantity + 1);
     const handleMinus = () => setQuantity(textQuantity - 1);
 
+    // 🛠️ ترتيب منطقي وسليم للـ Checkout
     const handleCheckout = async () => {
-        await clearCart();
-        window.location.reload();
-        alert("Order placed successfully! Cart cleared. 🎉");
+        try {
+            await clearCart();
+            // 1. أظهري الرسالة الأول بنجاح
+            alert("Order placed successfully! Cart cleared. 🎉");
+            // 2. تصفير الـ State محلياً فوراً عشان الـ UI يتحدث
+            setCart({ items: [], total: 0 });
+            // 3. عمل ريفريش خفيف للصفحة للتأكيد
+            window.location.reload();
+        } catch (error) {
+            console.error("Checkout failed:", error);
+            alert("Something went wrong during checkout.");
+        }
     };
-
 
     useEffect(() => {
         getCart().then((cart) => {
