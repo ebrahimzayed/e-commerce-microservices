@@ -24,7 +24,7 @@ const Cart = () => {
 
     const handleCheckout = async () => {
         await clearCart();
-        setCart({ items: [], total: 0 });
+        window.location.reload();
         alert("Order placed successfully! Cart cleared. 🎉");
     };
 
