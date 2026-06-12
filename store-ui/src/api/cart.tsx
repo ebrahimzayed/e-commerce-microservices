@@ -1,6 +1,7 @@
 import axiosClient, { cartUrl } from "./config"
 
-const addToCart = async (item: any) => {
+// 1. خليناها export عادي جداً عشان تتندى بالاسم
+export const addToCart = async (item: any) => {
     try {
         const currentCart = await getCart();
         const existingItems = currentCart?.items || [];
@@ -42,14 +43,12 @@ export const getCart = async () => {
     }
 }
 
-// 🔥 التعديل الجديد: نداء الـ DELETE API لمسح السلة من الـ Redis تماماً
 export const clearCart = async () => {
     try {
         const response = await axiosClient.delete(cartUrl + 'cart' + '/john@example.com');
         return response.data;
     } catch (err: any) {
         console.log(err);
+        throw err; // بنعمل throw عشان لو فيه error حقيقي يبان في الـ console
     }
 }
-
-export default addToCart
