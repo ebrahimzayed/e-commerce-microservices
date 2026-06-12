@@ -69,9 +69,10 @@ public class CartController {
         }).then();
     }
 
+    // 🔥 التعديل المتصلح: تحويل الـ Long لـ Boolean عشان يطابق الـ Type الصح
     @DeleteMapping("/cart/{customerId}")
     public Mono<Boolean> deleteCart(@PathVariable String customerId) {
         LOG.info("Clearing cart from Redis for customer: {}", customerId);
-        return redisTemplate.delete(customerId);
+        return redisTemplate.delete(customerId).map(count -> count > 0);
     }
 }
