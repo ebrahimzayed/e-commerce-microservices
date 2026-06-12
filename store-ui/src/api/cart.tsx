@@ -1,6 +1,5 @@
 import axiosClient, { cartUrl } from "./config"
 
-// 1. خليناها export عادي جداً عشان تتندى بالاسم
 export const addToCart = async (item: any) => {
     try {
         const currentCart = await getCart();
@@ -49,6 +48,9 @@ export const clearCart = async () => {
         return response.data;
     } catch (err: any) {
         console.log(err);
-        throw err; // بنعمل throw عشان لو فيه error حقيقي يبان في الـ console
+        throw err;
     }
 }
+
+// 🔥 رجعنا الـ default هنا عشان الشاشات التانية اللي بتعمل ومابتضربش
+export default addToCart;
