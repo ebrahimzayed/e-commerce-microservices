@@ -181,9 +181,15 @@ pipeline {
     post {
         success {
             echo "CI/CD Pipeline SUCCESS ✅"
+            mail to: 'ebrahimzayed123456789@gmail.com',
+                 subject: "SUCCESS: Job '${env.JOB_NAME}' [Build #${env.BUILD_NUMBER}]",
+                 body: "يا هندسة الـ Pipeline نجح بالكامل وكل الميكروسيرفيسز ارفعت على AWS بنجاح! 🎉\n\nشيك على التفاصيل من هنا: ${env.BUILD_URL}"
         }
         failure {
             echo "CI/CD Pipeline FAILED ❌"
+            mail to: 'ebrahimzayed123456789@gmail.com',
+                 subject: "FAILED: Job '${env.JOB_NAME}' [Build #${env.BUILD_NUMBER}]",
+                 body: "الحق يا هندسة الـ Pipeline ضرب وفيه مرحلة وقعت! ❌\n\nادخل شوف الـ Logs من هنا فوراً: ${env.BUILD_URL}console"
         }
     }
 }
