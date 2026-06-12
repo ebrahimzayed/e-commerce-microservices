@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.core.ReactiveValueOperations;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -66,5 +67,12 @@ public class CartController {
             c.setTotal(total);
             cartOps.set(c.getCustomerId(), c).subscribe();
         }).then();
+    }
+
+    // 🔥 التعديل الجديد: مسح السلة من الـ Redis عند الـ Checkout
+    @DeleteMapping("/cart/{customerId}")
+    public Mono<Boolean> deleteCart(@PathVariable String customerId) {
+        LOG.info("Clearing cart from Redis for customer: {}", customerId);
+        return redisTemplate.delete(customerId);
     }
 }

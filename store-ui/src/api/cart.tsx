@@ -42,13 +42,10 @@ export const getCart = async () => {
     }
 }
 
+// 🔥 التعديل الجديد: نداء الـ DELETE API لمسح السلة من الـ Redis تماماً
 export const clearCart = async () => {
     try {
-        const response = await axiosClient.post(cartUrl + 'cart', {
-            customerId: "john@example.com",
-            items: [],
-            total: 0
-        });
+        const response = await axiosClient.delete(cartUrl + 'cart' + '/john@example.com');
         return response.data;
     } catch (err: any) {
         console.log(err);
