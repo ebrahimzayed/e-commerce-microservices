@@ -28,6 +28,7 @@ const Cart = () => {
         alert("Order placed successfully! Cart cleared. 🎉");
     };
 
+
     useEffect(() => {
         getCart().then((cart) => {
             console.log(cart)
