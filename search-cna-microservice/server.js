@@ -2,8 +2,8 @@ const axios = require("axios");
 const express = require("express");
 const app = express();
 const PORT = process.env.PORT || 4000;
-const ELASTIC_URL = process.env.ELASTIC_URL || "http://search-engine:9200"\;
-const PRODUCTS_URL = process.env.PRODUCTS_URL || "http://products-service:5000"\;
+const ELASTIC_URL = process.env.ELASTIC_URL || "http://search-engine:9200";
+const PRODUCTS_URL = process.env.PRODUCTS_URL || "http://products-service:5000";
 
 console.log("Search service running on port", PORT);
 console.log("Elasticsearch URL:", ELASTIC_URL);
