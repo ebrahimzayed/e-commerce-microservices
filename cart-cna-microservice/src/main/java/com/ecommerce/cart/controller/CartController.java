@@ -69,7 +69,6 @@ public class CartController {
         }).then();
     }
 
-    // 🔥 التعديل الجديد: مسح السلة من الـ Redis عند الـ Checkout
     @DeleteMapping("/cart/{customerId}")
     public Mono<Boolean> deleteCart(@PathVariable String customerId) {
         LOG.info("Clearing cart from Redis for customer: {}", customerId);
