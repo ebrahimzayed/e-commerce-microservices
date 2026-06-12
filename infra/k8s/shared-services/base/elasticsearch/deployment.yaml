@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: es-deployment
+  namespace: shared-services # ضفنا النيم-سبيس هنا لضمان التطبيق في المكان الصح
 spec:
   selector:
     matchLabels:
@@ -11,6 +12,8 @@ spec:
       labels:
         app: es-deployment
     spec:
+      securityContext:
+        fsGroup: 1000
       containers:
       - name: es
         image: elasticsearch:7.17.9
@@ -33,10 +36,13 @@ spec:
         volumeMounts:
         - name: es-data
           mountPath: /usr/share/elasticsearch/data
+
       volumes:
       - name: es-data
         persistentVolumeClaim:
           claimName: es-pvc
+
+      # هنا تعديل الـ initContainers بوجود الـ خطوتين معاً
       initContainers:
       - name: increase-vm-max-map
         image: busybox
@@ -44,3 +50,13 @@ spec:
         command: ["sysctl", "-w", "vm.max_map_count=262144"]
         securityContext:
           privileged: true
+          
+      - name: fix-permissions
+        image: busybox
+        imagePullPolicy: IfNotPresent
+        command: ["sh", "-c", "chown -R 1000:1000 /usr/share/elasticsearch/data"]
+        securityContext:
+          runAsUser: 0 # يشتغل كـ root لتعديل الصلاحيات للمجلد المقفول
+        volumeMounts:
+        - name: es-data
+          mountPath: /usr/share/elasticsearch/data
